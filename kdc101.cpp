@@ -193,20 +193,39 @@ int move_relative(const char *serialNo, const double displacement)
 }
 
 
-int jog(const char *serialNo, MOT_TravelDirection direction)
+int jog(const char *serialNo, MOT_TravelDirection direction, MOT_JogModes jogMode)
 {
     CC_ClearMessageQueue(serialNo);
 
-    short rc = CC_MoveJog(serialNo, direction);
+    short rc = CC_SetJogMode(serialNo, jogMode, MOT_StopModes::MOT_Profiled);
+    if (rc != 0) {
+        printf("Failed to set jog mode: %hd\r\n", rc);
+        return 1;
+    }
 
+    rc = CC_MoveJog(serialNo, direction);
     if (rc != 0) {
         printf("Failed to start jog: %hd\r\n", rc);
         return 1;
     }
 
-    if (wait_for_motor_message(serialNo, MESSAGE_ID_MOVED) != 0) {
-        return 1;
+    if (jogMode == MOT_JogModes::MOT_Continuous) {
+        printf("Device %s jogging continuously in direction %d\r\n", serialNo, direction);
+
+        // Wait for user input to stop jogging
+        printf("Press any key to stop jogging...\r\n");
+        _getch(); // Wait for user input
+
+        CC_StopProfiled(serialNo);
+        
+        wait_for_motor_message(serialNo, MESSAGE_ID_STOPPED); // Wait for stop message
+    } else {
+        printf("Device %s jogging in direction %d for a single step\r\n", serialNo, direction);
+        if (wait_for_motor_message(serialNo, MESSAGE_ID_MOVED) != 0) {
+            return 1;
+        }
     }
+    
     
     printf("Device %s stopped jogging\r\n", serialNo);
 
@@ -257,7 +276,7 @@ int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t 
 
     get_position(testSerialNo);
 
-    jog(testSerialNo, MOT_TravelDirection::MOT_Forwards);
+    jog(testSerialNo, MOT_TravelDirection::MOT_Forwards, MOT_JogModes::MOT_Continuous);
 
     get_position(testSerialNo);
 
