@@ -157,6 +157,39 @@ int get_position(const char *serialNo)
 }
 
 
+int move_relative(const char *serialNo, const double displacement)
+{
+    CC_ClearMessageQueue(serialNo);
+
+    // convert to device units
+    int device_unit;
+    CC_GetDeviceUnitFromRealValue(serialNo, displacement, &device_unit, UNIT_TYPE_DISTANCE);
+    printf("Moving device %s by displacement %.2f mm (device units: %d)\r\n", serialNo, displacement, device_unit);
+
+    short rc = CC_MoveRelative(serialNo, device_unit);
+    if (rc != 0) {
+        printf("Failed to start relative move: %hd\r\n", rc);
+        return 1;
+    }
+    
+    printf("Device %s moving\r\n", serialNo);
+
+    // wait for completion
+    WORD messageType;
+    WORD messageId;
+    DWORD messageData;
+
+    do {
+        CC_WaitForMessage(serialNo, &messageType, &messageId, &messageData);
+        printf("Recieved message %hu with ID %hu and data %lu\r\n", messageType, messageId, messageData);
+    } while(messageType != 2 || messageId != 1);
+
+    printf("Device done moving by displacement %g mm\r\n", displacement);
+
+    return 0;
+}
+
+
 int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t its wide char for windows
 {
     TLI_InitializeSimulations();
@@ -192,6 +225,11 @@ int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t 
     // Move device to position 30
     const double position = 10.0; // Target in real units
     move_position(testSerialNo, position);
+
+    get_position(testSerialNo);
+
+    const double displacement = 5.0; // Displacement in real units
+    move_relative(testSerialNo, displacement);
 
     get_position(testSerialNo);
 
