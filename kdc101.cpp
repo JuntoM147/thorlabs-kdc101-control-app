@@ -66,9 +66,70 @@ int initialize(char* testSerialNo) {
         return 1;
     }
 
+    // Use the enable function from your SDK version
+    if (CC_EnableChannel(testSerialNo) != 0) { 
+        printf("Failed to enable device channel\r\n");
+        return 1;
+    }
+
     // start the device polling at 200ms intervals
     CC_StartPolling(testSerialNo, 200);
     
+    return 0;
+}
+
+
+int home_device(const char *serialNo)
+{
+    // Home device
+    CC_ClearMessageQueue(serialNo);
+    CC_Home(serialNo);
+    printf("Device %s homing\r\n", serialNo);
+
+    // wait for completion
+    WORD messageType;
+    WORD messageId;
+    DWORD messageData;
+
+    do {
+        CC_WaitForMessage(serialNo, &messageType, &messageId, &messageData);
+        printf("Recieved message %hu with ID %hu and data %lu\r\n", messageType, messageId, messageData);
+    } while(messageType != 2 || messageId != 0);
+
+    printf("Device homed\r\n");
+
+    return 0;
+}
+
+
+int move_position(const char *serialNo, int position)
+{
+    // move to position (channel 1)
+    CC_ClearMessageQueue(serialNo);
+    CC_MoveToPosition(serialNo, position);
+    printf("Device %s moving\r\n", serialNo);
+
+    // wait for completion
+    WORD messageType;
+    WORD messageId;
+    DWORD messageData;
+
+    do {
+        CC_WaitForMessage(serialNo, &messageType, &messageId, &messageData);
+        printf("Recieved message %hu with ID %hu and data %lu\r\n", messageType, messageId, messageData);
+    } while(messageType != 2 || messageId != 0);
+
+    printf("Device moved to position %d\r\n", position);
+
+    return 0;
+}
+
+int get_position(const char *serialNo)
+{
+    // get actual position
+    int pos = CC_GetPosition(serialNo);
+    printf("Device %s moved to %d\r\n", serialNo, pos);
+
     return 0;
 }
 
@@ -86,15 +147,33 @@ int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t 
         printf("Found device with serial number %d\r\n", SERIAL_NUMBER);
     }
 
+    char* testSerialNo = SERIAL_NUMBER_STR;
+
     // Initialize device
-    if (initialize(SERIAL_NUMBER_STR) != 0) {
+    if (initialize(testSerialNo) != 0) {
         printf("Failed to initialize device\r\n");
         TLI_UninitializeSimulations();
         return 1;
     } else {
         printf("Initialized device\r\n");
+        Sleep(3000); // Wait for 1 second to ensure the device is ready
     }
 
+    // Home device
+    home_device(testSerialNo);
+
+    //Sleep(20000); // Wait for 3 seconds to ensure the device is homed
+
+    // Move device to position 10
+    // int position = 30;
+    // move_position(testSerialNo, position);
+
+    // get_position(testSerialNo);
+
+    // Stop polling and close device
+    CC_StopPolling(testSerialNo);
+    CC_DisableChannel(testSerialNo); // Disable the channel before closing
+    CC_Close(testSerialNo);
     TLI_UninitializeSimulations();
 
     return 0;
