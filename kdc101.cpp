@@ -9,7 +9,7 @@
 #include "Thorlabs.MotionControl.KCube.DCServo.h"
 
 
-// Find the device with given serial number
+// Find the device with given serial number found -> 1 not found -> 0
 int find_device(int serialNum) {
     if (TLI_BuildDeviceList() != 0)
     {
@@ -59,20 +59,41 @@ int find_device(int serialNum) {
 }
 
 
+int initialize(char* testSerialNo) {
+    if(CC_Open(testSerialNo) != 0)
+    {
+        printf("Failed to open device with serial number %s\r\n", testSerialNo);
+        return 1;
+    }
+
+    // start the device polling at 200ms intervals
+    CC_StartPolling(testSerialNo, 200);
+    
+    return 0;
+}
+
+
 int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t its wide char for windows
 {
     TLI_InitializeSimulations();
 
-    // identify and access device
+    // Find device
     if(find_device(SERIAL_NUMBER) == 0) {
         printf("Failed to find device with serial number %d\r\n", SERIAL_NUMBER);
         TLI_UninitializeSimulations();
         return 1;
+    } else {
+        printf("Found device with serial number %d\r\n", SERIAL_NUMBER);
     }
 
-    char testSerialNo[16] = SERIAL_NUMBER_STR;
-
-    printf("Found device with serial number %d\r\n", SERIAL_NUMBER);
+    // Initialize device
+    if (initialize(SERIAL_NUMBER_STR) != 0) {
+        printf("Failed to initialize device\r\n");
+        TLI_UninitializeSimulations();
+        return 1;
+    } else {
+        printf("Initialized device\r\n");
+    }
 
     TLI_UninitializeSimulations();
 
