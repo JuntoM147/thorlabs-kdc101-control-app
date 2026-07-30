@@ -2,6 +2,10 @@
 #define SERIAL_NUMBER 27000001
 #define SERIAL_NUMBER_STR "27000001"
 
+#define UNIT_TYPE_DISTANCE 0
+#define UNIT_TYPE_VELOCITY 1
+#define UNIT_TYPE_ACCELERATION 2
+
 #include <stdlib.h>
 #include <conio.h>
 #include <stdio.h>
@@ -9,12 +13,12 @@
 #include "Thorlabs.MotionControl.KCube.DCServo.h"
 
 
-// Find the device with given serial number found -> 1 not found -> 0
-int find_device(int serialNum) {
+// 1 = found, 0 = not found, -1 = error
+int find_device(void) {
     if (TLI_BuildDeviceList() != 0)
     {
         printf("Failed to build device list\r\n");
-        return 1;
+        return -1;
     }
 
     // get device list size   
@@ -59,10 +63,16 @@ int find_device(int serialNum) {
 }
 
 
-int initialize(char* testSerialNo) {
+int initialize(const char* testSerialNo) {
     if(CC_Open(testSerialNo) != 0)
     {
         printf("Failed to open device with serial number %s\r\n", testSerialNo);
+        return 1;
+    }
+
+    if (!CC_LoadSettings(testSerialNo)) {
+        printf("Failed to load device settings\r\n");
+        CC_Close(testSerialNo);
         return 1;
     }
 
@@ -102,11 +112,22 @@ int home_device(const char *serialNo)
 }
 
 
-int move_position(const char *serialNo, int position)
+int move_position(const char *serialNo, const double position)
 {
     // move to position (channel 1)
     CC_ClearMessageQueue(serialNo);
-    CC_MoveToPosition(serialNo, position);
+
+    // convert to device units
+    int device_unit;
+    CC_GetDeviceUnitFromRealValue(serialNo, position, &device_unit, UNIT_TYPE_DISTANCE);
+    printf("Moving device %s to position %.2f mm (device units: %d)\r\n", serialNo, position, device_unit);
+
+    short rc = CC_MoveToPosition(serialNo, device_unit);
+    if (rc != 0) {
+        printf("Failed to start move: %hd\r\n", rc);
+        return 1;
+    }
+    
     printf("Device %s moving\r\n", serialNo);
 
     // wait for completion
@@ -117,18 +138,20 @@ int move_position(const char *serialNo, int position)
     do {
         CC_WaitForMessage(serialNo, &messageType, &messageId, &messageData);
         printf("Recieved message %hu with ID %hu and data %lu\r\n", messageType, messageId, messageData);
-    } while(messageType != 2 || messageId != 0);
+    } while(messageType != 2 || messageId != 1);
 
-    printf("Device moved to position %d\r\n", position);
+    printf("Device done moving to position %g mm\r\n", position);
 
     return 0;
 }
 
 int get_position(const char *serialNo)
 {
-    // get actual position
-    int pos = CC_GetPosition(serialNo);
-    printf("Device %s moved to %d\r\n", serialNo, pos);
+    int device_unit = CC_GetPosition(serialNo);
+    double position_real;
+    CC_GetRealValueFromDeviceUnit(serialNo, device_unit, &position_real, UNIT_TYPE_DISTANCE);
+
+    printf("Get position: Device %s is at %g mm (device units: %d)\r\n", serialNo, position_real, device_unit);
 
     return 0;
 }
@@ -139,15 +162,20 @@ int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t 
     TLI_InitializeSimulations();
 
     // Find device
-    if(find_device(SERIAL_NUMBER) == 0) {
-        printf("Failed to find device with serial number %d\r\n", SERIAL_NUMBER);
+    int rc = find_device();
+    if(rc < 0) {
+        printf("Error occurred while searching for device with serial number %d\r\n", SERIAL_NUMBER);
+        TLI_UninitializeSimulations();
+        return 1;
+    } else if(rc == 0) {
+        printf("Device with serial number %d not found\r\n", SERIAL_NUMBER);
         TLI_UninitializeSimulations();
         return 1;
     } else {
         printf("Found device with serial number %d\r\n", SERIAL_NUMBER);
     }
 
-    char* testSerialNo = SERIAL_NUMBER_STR;
+    const char* testSerialNo = SERIAL_NUMBER_STR;
 
     // Initialize device
     if (initialize(testSerialNo) != 0) {
@@ -156,19 +184,16 @@ int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t 
         return 1;
     } else {
         printf("Initialized device\r\n");
-        Sleep(3000); // Wait for 1 second to ensure the device is ready
     }
 
     // Home device
     home_device(testSerialNo);
 
-    //Sleep(20000); // Wait for 3 seconds to ensure the device is homed
+    // Move device to position 30
+    const double position = 10.0; // Target in real units
+    move_position(testSerialNo, position);
 
-    // Move device to position 10
-    // int position = 30;
-    // move_position(testSerialNo, position);
-
-    // get_position(testSerialNo);
+    get_position(testSerialNo);
 
     // Stop polling and close device
     CC_StopPolling(testSerialNo);
