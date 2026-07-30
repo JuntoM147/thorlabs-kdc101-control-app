@@ -37,7 +37,8 @@ int wait_for_motor_message(const char *serialNo, WORD expectedMessageId)
 }
 
 // 1 = found, 0 = not found, -1 = error
-int find_device(void) {
+int find_device(void) 
+{
     if (TLI_BuildDeviceList() != 0)
     {
         printf("Failed to build device list\r\n");
@@ -86,7 +87,8 @@ int find_device(void) {
 }
 
 
-int initialize(const char* testSerialNo) {
+int initialize(const char* testSerialNo) 
+{
     if(CC_Open(testSerialNo) != 0)
     {
         printf("Failed to open device with serial number %s\r\n", testSerialNo);
@@ -191,47 +193,19 @@ int move_relative(const char *serialNo, const double displacement)
 }
 
 
-int jog(const char *serialNo, MOT_TravelDirection direction, const MOT_JogModes jogMode)
+int jog(const char *serialNo, MOT_TravelDirection direction)
 {
-    MOT_StopModes stopMode = MOT_Profiled;
-
     CC_ClearMessageQueue(serialNo);
 
-    short rc = CC_SetJogMode(serialNo, jogMode, stopMode);
+    short rc = CC_MoveJog(serialNo, direction);
 
-    if (rc != 0) {
-        printf("Failed to set jog mode: %hd\r\n", rc);
-        return 1;
-    }
-
-    rc = CC_MoveJog(serialNo, direction);
     if (rc != 0) {
         printf("Failed to start jog: %hd\r\n", rc);
         return 1;
     }
 
-    if (jogMode == MOT_Continuous) {
-        printf("Jogging continuously. Press any key to stop...\r\n");
-        _getch();
-
-        rc = CC_StopProfiled(serialNo);
-
-        if (rc != 0) {
-            printf("Failed to stop jog: %hd\r\n", rc);
-            return 1;
-        }
-
-        if (wait_for_motor_message(serialNo, MESSAGE_ID_STOPPED) != 0) {
-            return 1;
-        }
-
-        printf("Device %s stopped jogging\r\n", serialNo);
-    } else {
-        if (wait_for_motor_message(serialNo, MESSAGE_ID_MOVED) != 0) {
-            return 1;
-        }
-
-        printf("Device %s completed jog step\r\n", serialNo);
+    if (wait_for_motor_message(serialNo, MESSAGE_ID_MOVED) != 0) {
+        return 1;
     }
     
     printf("Device %s stopped jogging\r\n", serialNo);
@@ -273,17 +247,19 @@ int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t 
     home_device(testSerialNo);
 
     // Move device to position 30
-    const double position = 10.0; // Target in real units
-    move_position(testSerialNo, position);
+    // const double position = 10.0; // Target in real units
+    // move_position(testSerialNo, position);
+
+    // get_position(testSerialNo);
+
+    // const double displacement = 5.0; // Displacement in real units
+    // move_relative(testSerialNo, displacement);
 
     get_position(testSerialNo);
 
-    const double displacement = 5.0; // Displacement in real units
-    move_relative(testSerialNo, displacement);
+    jog(testSerialNo, MOT_TravelDirection::MOT_Forwards);
 
     get_position(testSerialNo);
-
-    // jog(testSerialNo, MOT_TravelDirection::MOT_Forwards, MOT_JogModes::MOT_SingleStep);
 
     // Stop polling and close device
     CC_StopPolling(testSerialNo);
