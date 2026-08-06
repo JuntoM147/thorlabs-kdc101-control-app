@@ -29,11 +29,8 @@ int wait_for_motor_message(WORD expectedMessageId)
 
     do {
         if (!CC_WaitForMessage(serialNo, &messageType, &messageId, &messageData)) {
-            printf("Failed while waiting for device message\r\n");
             return 1;
         }
-
-        printf("Received message type %hu, ID %hu, data %lu\r\n", messageType, messageId, (unsigned long)messageData);
 
     } while (messageType != MESSAGE_TYPE_GENERIC_MOTOR || messageId != expectedMessageId);
 
@@ -57,7 +54,6 @@ int find_device(void)
     short rc = TLI_BuildDeviceList();
     if (rc != 0)
     {
-        printf("Failed to build device list %hd\r\n", rc);
         return -1;
     }
 
@@ -95,7 +91,6 @@ int find_device(void)
         }
 
         // output
-        printf("Found Device! Serial Number: %s : %s\r\n", curr_serialNo, curr_desc);
         p = strtok_s(NULL, ",", &searchContext);
     }
 
@@ -105,21 +100,17 @@ int find_device(void)
 
 int initialize(void) 
 {
-    if(CC_Open(serialNo) != 0)
-    {
-        printf("Failed to open device with serial number %s\r\n", serialNo);
+    if(CC_Open(serialNo) != 0) {
         return 1;
     }
 
     if (!CC_LoadSettings(serialNo)) {
-        printf("Failed to load device settings\r\n");
         CC_Close(serialNo);
         return 1;
     }
 
     // Use the enable function from your SDK version
     if (CC_EnableChannel(serialNo) != 0) { 
-        printf("Failed to enable device channel\r\n");
         return 1;
     }
 
@@ -130,17 +121,37 @@ int initialize(void)
 }
 
 
+int connect_device(void)
+{   
+    initialize_simulation();
+
+    int rc = find_device();
+    if (rc == 0) {
+        uninitialize_simulation();
+        return 1; // Device not found
+    } else if (rc == -1) {
+        uninitialize_simulation();
+        return 2; // Error occurred
+    }
+
+    rc = initialize();
+    if (rc != 0) {
+        uninitialize_simulation();
+        return 1;
+    }
+
+    return 0;
+}
+
+
 int home_device(void)
 {
     // Home device
     CC_ClearMessageQueue(serialNo);
     
     CC_Home(serialNo);
-    printf("Device %s homing\r\n", serialNo);
 
     wait_for_motor_message(MESSAGE_ID_HOMED); // Wait for homing complete message
-
-    printf("Device homed\r\n");
 
     return 0;
 }
@@ -154,19 +165,13 @@ int move_position(const double position)
     // convert to device units
     int device_unit;
     CC_GetDeviceUnitFromRealValue(serialNo, position, &device_unit, UNIT_TYPE_DISTANCE);
-    printf("Moving device %s to position %.2f mm (device units: %d)\r\n", serialNo, position, device_unit);
 
     short rc = CC_MoveToPosition(serialNo, device_unit);
     if (rc != 0) {
-        printf("Failed to start move: %hd\r\n", rc);
         return 1;
     }
-    
-    printf("Device %s moving\r\n", serialNo);
 
     wait_for_motor_message(MESSAGE_ID_MOVED);
-
-    printf("Device done moving to position %g mm\r\n", position);
 
     return 0;
 }
@@ -189,37 +194,29 @@ int move_relative(const double displacement)
     // convert to device units
     int device_unit;
     CC_GetDeviceUnitFromRealValue(serialNo, displacement, &device_unit, UNIT_TYPE_DISTANCE);
-    printf("Moving device %s by displacement %.2f mm (device units: %d)\r\n", serialNo, displacement, device_unit);
 
     short rc = CC_MoveRelative(serialNo, device_unit);
     if (rc != 0) {
-        printf("Failed to start relative move: %hd\r\n", rc);
         return 1;
     }
-    
-    printf("Device %s moving\r\n", serialNo);
-
     wait_for_motor_message(MESSAGE_ID_MOVED);
-
-    printf("Device done moving by displacement %g mm\r\n", displacement);
 
     return 0;
 }
 
 
-int jog(JogDirection direction)
+int jog(int direction)
 {
     CC_ClearMessageQueue(serialNo);
 
     short rc = CC_SetJogMode(serialNo, MOT_JogModes::MOT_SingleStep, MOT_StopModes::MOT_Profiled);
     if (rc != 0) {
-        printf("Failed to set jog mode: %hd\r\n", rc);
         return 1;
     }
 
     MOT_TravelDirection mot_direction;
 
-    if (direction == JogDirection::Forwards) {
+    if (direction == 1) {
         mot_direction = MOT_TravelDirection::MOT_Forwards;
     } else {
         mot_direction = MOT_TravelDirection::MOT_Backwards;
@@ -227,28 +224,25 @@ int jog(JogDirection direction)
 
     rc = CC_MoveJog(serialNo, mot_direction);
     if (rc != 0) {
-        printf("Failed to start jog: %hd\r\n", rc);
         return 1;
     }
 
-    printf("Device %s jogging in direction %d for a single step\r\n", serialNo, direction);
     if (wait_for_motor_message(MESSAGE_ID_MOVED) != 0) {
         return 1;
     }
-    
-    printf("Device %s stopped jogging\r\n", serialNo);
 
     return 0;
 }
 
 
-int close(void)
+int close_device(void)
 {
     // Stop polling and close device
     CC_StopPolling(serialNo);
     CC_DisableChannel(serialNo); // Disable the channel before closing
     CC_Close(serialNo);
-    TLI_UninitializeSimulations();
+
+    uninitialize_simulation();
 
     return 0;
 }
