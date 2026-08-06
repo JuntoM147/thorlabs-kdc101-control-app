@@ -1,3 +1,11 @@
+#include "kdc101.hpp"
+
+#include <stdlib.h>
+#include <conio.h>
+#include <stdio.h>
+
+#include "Thorlabs.MotionControl.KCube.DCServo.h"
+
 #define DEVICE_ID 27
 #define SERIAL_NUMBER 27000001
 #define SERIAL_NUMBER_STR "27000001"
@@ -10,14 +18,10 @@
 #define MESSAGE_ID_STOPPED         2
 #define MESSAGE_ID_HOMED           0
 
-#include <stdlib.h>
-#include <conio.h>
-#include <stdio.h>
-
-#include "Thorlabs.MotionControl.KCube.DCServo.h"
+constexpr char const *serialNo = SERIAL_NUMBER_STR;
 
 // Helper
-int wait_for_motor_message(const char *serialNo, WORD expectedMessageId)
+int wait_for_motor_message(WORD expectedMessageId)
 {
     WORD messageType = 0;
     WORD messageId = 0;
@@ -36,12 +40,24 @@ int wait_for_motor_message(const char *serialNo, WORD expectedMessageId)
     return 0;
 }
 
+
+void initialize_simulation(void)
+{
+    TLI_InitializeSimulations();
+}
+
+void uninitialize_simulation(void)
+{
+    TLI_UninitializeSimulations();
+}
+
 // 1 = found, 0 = not found, -1 = error
 int find_device(void) 
-{
-    if (TLI_BuildDeviceList() != 0)
+{   
+    short rc = TLI_BuildDeviceList();
+    if (rc != 0)
     {
-        printf("Failed to build device list\r\n");
+        printf("Failed to build device list %hd\r\n", rc);
         return -1;
     }
 
@@ -74,7 +90,7 @@ int find_device(void)
         strncpy_s(curr_serialNo, deviceInfo.serialNo, 8);
         curr_serialNo[8] = '\0';
 
-        if (strncmp(curr_serialNo, SERIAL_NUMBER_STR, 8) == 0) {
+        if (strncmp(curr_serialNo, serialNo, 8) == 0) {
             found = 1;
         }
 
@@ -87,34 +103,34 @@ int find_device(void)
 }
 
 
-int initialize(const char* testSerialNo) 
+int initialize(void) 
 {
-    if(CC_Open(testSerialNo) != 0)
+    if(CC_Open(serialNo) != 0)
     {
-        printf("Failed to open device with serial number %s\r\n", testSerialNo);
+        printf("Failed to open device with serial number %s\r\n", serialNo);
         return 1;
     }
 
-    if (!CC_LoadSettings(testSerialNo)) {
+    if (!CC_LoadSettings(serialNo)) {
         printf("Failed to load device settings\r\n");
-        CC_Close(testSerialNo);
+        CC_Close(serialNo);
         return 1;
     }
 
     // Use the enable function from your SDK version
-    if (CC_EnableChannel(testSerialNo) != 0) { 
+    if (CC_EnableChannel(serialNo) != 0) { 
         printf("Failed to enable device channel\r\n");
         return 1;
     }
 
     // start the device polling at 200ms intervals
-    CC_StartPolling(testSerialNo, 200);
+    CC_StartPolling(serialNo, 200);
     
     return 0;
 }
 
 
-int home_device(const char *serialNo)
+int home_device(void)
 {
     // Home device
     CC_ClearMessageQueue(serialNo);
@@ -122,7 +138,7 @@ int home_device(const char *serialNo)
     CC_Home(serialNo);
     printf("Device %s homing\r\n", serialNo);
 
-    wait_for_motor_message(serialNo, MESSAGE_ID_HOMED); // Wait for homing complete message
+    wait_for_motor_message(MESSAGE_ID_HOMED); // Wait for homing complete message
 
     printf("Device homed\r\n");
 
@@ -130,7 +146,7 @@ int home_device(const char *serialNo)
 }
 
 
-int move_position(const char *serialNo, const double position)
+int move_position(const double position)
 {
     // move to position (channel 1)
     CC_ClearMessageQueue(serialNo);
@@ -148,7 +164,7 @@ int move_position(const char *serialNo, const double position)
     
     printf("Device %s moving\r\n", serialNo);
 
-    wait_for_motor_message(serialNo, MESSAGE_ID_MOVED);
+    wait_for_motor_message(MESSAGE_ID_MOVED);
 
     printf("Device done moving to position %g mm\r\n", position);
 
@@ -156,19 +172,17 @@ int move_position(const char *serialNo, const double position)
 }
 
 
-int get_position(const char *serialNo)
+double get_position(void)
 {
     int device_unit = CC_GetPosition(serialNo);
     double position_real;
     CC_GetRealValueFromDeviceUnit(serialNo, device_unit, &position_real, UNIT_TYPE_DISTANCE);
 
-    printf("Get position: Device %s is at %g mm (device units: %d)\r\n", serialNo, position_real, device_unit);
-
-    return 0;
+    return position_real;
 }
 
 
-int move_relative(const char *serialNo, const double displacement)
+int move_relative(const double displacement)
 {
     CC_ClearMessageQueue(serialNo);
 
@@ -185,7 +199,7 @@ int move_relative(const char *serialNo, const double displacement)
     
     printf("Device %s moving\r\n", serialNo);
 
-    wait_for_motor_message(serialNo, MESSAGE_ID_MOVED);
+    wait_for_motor_message(MESSAGE_ID_MOVED);
 
     printf("Device done moving by displacement %g mm\r\n", displacement);
 
@@ -193,39 +207,34 @@ int move_relative(const char *serialNo, const double displacement)
 }
 
 
-int jog(const char *serialNo, MOT_TravelDirection direction, MOT_JogModes jogMode)
+int jog(JogDirection direction)
 {
     CC_ClearMessageQueue(serialNo);
 
-    short rc = CC_SetJogMode(serialNo, jogMode, MOT_StopModes::MOT_Profiled);
+    short rc = CC_SetJogMode(serialNo, MOT_JogModes::MOT_SingleStep, MOT_StopModes::MOT_Profiled);
     if (rc != 0) {
         printf("Failed to set jog mode: %hd\r\n", rc);
         return 1;
     }
 
-    rc = CC_MoveJog(serialNo, direction);
+    MOT_TravelDirection mot_direction;
+
+    if (direction == JogDirection::Forwards) {
+        mot_direction = MOT_TravelDirection::MOT_Forwards;
+    } else {
+        mot_direction = MOT_TravelDirection::MOT_Backwards;
+    }
+
+    rc = CC_MoveJog(serialNo, mot_direction);
     if (rc != 0) {
         printf("Failed to start jog: %hd\r\n", rc);
         return 1;
     }
 
-    if (jogMode == MOT_JogModes::MOT_Continuous) {
-        printf("Device %s jogging continuously in direction %d\r\n", serialNo, direction);
-
-        // Wait for user input to stop jogging
-        printf("Press any key to stop jogging...\r\n");
-        _getch(); // Wait for user input
-
-        CC_StopProfiled(serialNo);
-        
-        wait_for_motor_message(serialNo, MESSAGE_ID_STOPPED); // Wait for stop message
-    } else {
-        printf("Device %s jogging in direction %d for a single step\r\n", serialNo, direction);
-        if (wait_for_motor_message(serialNo, MESSAGE_ID_MOVED) != 0) {
-            return 1;
-        }
+    printf("Device %s jogging in direction %d for a single step\r\n", serialNo, direction);
+    if (wait_for_motor_message(MESSAGE_ID_MOVED) != 0) {
+        return 1;
     }
-    
     
     printf("Device %s stopped jogging\r\n", serialNo);
 
@@ -233,57 +242,12 @@ int jog(const char *serialNo, MOT_TravelDirection direction, MOT_JogModes jogMod
 }
 
 
-int wmain(int argc, wchar_t* argv[]) // wmain is for windows, same with wchar_t its wide char for windows
+int close(void)
 {
-    TLI_InitializeSimulations();
-
-    // Find device
-    int rc = find_device();
-    if(rc < 0) {
-        printf("Error occurred while searching for device with serial number %d\r\n", SERIAL_NUMBER);
-        TLI_UninitializeSimulations();
-        return 1;
-    } else if(rc == 0) {
-        printf("Device with serial number %d not found\r\n", SERIAL_NUMBER);
-        TLI_UninitializeSimulations();
-        return 1;
-    } else {
-        printf("Found device with serial number %d\r\n", SERIAL_NUMBER);
-    }
-
-    const char* testSerialNo = SERIAL_NUMBER_STR;
-
-    // Initialize device
-    if (initialize(testSerialNo) != 0) {
-        printf("Failed to initialize device\r\n");
-        TLI_UninitializeSimulations();
-        return 1;
-    } else {
-        printf("Initialized device\r\n");
-    }
-
-    // Home device
-    home_device(testSerialNo);
-
-    // Move device to position 30
-    // const double position = 10.0; // Target in real units
-    // move_position(testSerialNo, position);
-
-    // get_position(testSerialNo);
-
-    // const double displacement = 5.0; // Displacement in real units
-    // move_relative(testSerialNo, displacement);
-
-    get_position(testSerialNo);
-
-    jog(testSerialNo, MOT_TravelDirection::MOT_Forwards, MOT_JogModes::MOT_Continuous);
-
-    get_position(testSerialNo);
-
     // Stop polling and close device
-    CC_StopPolling(testSerialNo);
-    CC_DisableChannel(testSerialNo); // Disable the channel before closing
-    CC_Close(testSerialNo);
+    CC_StopPolling(serialNo);
+    CC_DisableChannel(serialNo); // Disable the channel before closing
+    CC_Close(serialNo);
     TLI_UninitializeSimulations();
 
     return 0;
