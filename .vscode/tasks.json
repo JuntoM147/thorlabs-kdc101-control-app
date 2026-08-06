@@ -1,0 +1,74 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build kdc101 test",
+            "type": "shell",
+            "command": "cl",
+            "args": [
+                "main.cpp",
+                "kdc101.cpp",
+
+                "/I",
+                "C:\\Program Files\\Thorlabs\\Kinesis",
+
+                "/link",
+
+                "/LIBPATH:C:\\Program Files\\Thorlabs\\Kinesis",
+
+                "Thorlabs.MotionControl.KCube.DCServo.lib"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/backend",
+                "env": {
+                    "PATH": "${env:PATH};C:\\Program Files\\Thorlabs\\Kinesis"
+                }
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        },
+
+        {
+            "label": "run kdc101 test",
+            "type": "shell",
+            "command": ".\\main.exe",
+            "options": {
+                "cwd": "${workspaceFolder}/backend",
+                "env": {
+                    "PATH": "${env:PATH};C:\\Program Files\\Thorlabs\\Kinesis"
+                }
+            }
+        },
+
+        {
+            "label": "build kdc101 dll",
+            "type": "shell",
+            "command": "cl",
+            "args": [
+                "/LD",
+                "kdc101.cpp",
+
+                "/I",
+                "C:\\Program Files\\Thorlabs\\Kinesis",
+
+                "/link",
+
+                "/OUT:kdc101.dll",
+
+                "/LIBPATH:C:\\Program Files\\Thorlabs\\Kinesis",
+
+                "Thorlabs.MotionControl.KCube.DCServo.lib"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/backend",
+                "env": {
+                    "PATH": "${env:PATH};C:\\Program Files\\Thorlabs\\Kinesis"
+                }
+            },
+            "problemMatcher": [
+                "$msCompile"
+            ]
+        }
+    ]
+}
