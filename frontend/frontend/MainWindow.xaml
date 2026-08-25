@@ -70,7 +70,7 @@
 
                 </Grid>
 
-                
+
                 <!-- Jog -->
                 <TextBlock
                     Text="Jog displacement (mm)"
@@ -168,7 +168,7 @@
 
         <GroupBox
             Grid.Column="2"
-            Header="Axis Y"
+            Header="Y Axis"
             FontSize="16"
             Padding="15">
 
@@ -312,3 +312,4 @@
     </Grid>
 
 </Window>
+ 

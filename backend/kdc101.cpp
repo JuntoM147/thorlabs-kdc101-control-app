@@ -7,9 +7,6 @@
 #include "Thorlabs.MotionControl.KCube.DCServo.h"
 
 #define DEVICE_ID 27
-#define SERIAL_NUMBER 27000001
-#define SERIAL_NUMBER_STR "27000001"
-
 #define UNIT_TYPE_DISTANCE 0
 #define UNIT_TYPE_VELOCITY 1
 #define UNIT_TYPE_ACCELERATION 2
@@ -18,10 +15,8 @@
 #define MESSAGE_ID_STOPPED         2
 #define MESSAGE_ID_HOMED           0
 
-constexpr char const *serialNo = SERIAL_NUMBER_STR;
-
 // Helper
-int wait_for_motor_message(WORD expectedMessageId)
+int wait_for_motor_message(const char* serialNo, WORD expectedMessageId)
 {
     WORD messageType = 0;
     WORD messageId = 0;
@@ -49,16 +44,13 @@ void uninitialize_simulation(void)
 }
 
 // 1 = found, 0 = not found, -1 = error
-int find_device(void) 
+int find_device(const char* serialNo)
 {   
     short rc = TLI_BuildDeviceList();
     if (rc != 0)
     {
         return -1;
     }
-
-    // get device list size   
-    short n = TLI_GetDeviceListSize();   
 
     // get KDC serial numbers
     char serialNumbers[250];
@@ -98,7 +90,7 @@ int find_device(void)
 }
 
 
-int initialize(void) 
+int initialize(const char* serialNo)
 {
     if(CC_Open(serialNo) != 0) {
         return 1;
@@ -109,8 +101,7 @@ int initialize(void)
         return 1;
     }
 
-    // Use the enable function from your SDK version
-    if (CC_EnableChannel(serialNo) != 0) { 
+    if (CC_EnableChannel(serialNo) != 0) {
         return 1;
     }
 
@@ -121,22 +112,17 @@ int initialize(void)
 }
 
 
-int connect_device(void)
-{   
-    initialize_simulation();
-
-    int rc = find_device();
+int connect_device(const char* serialNo)
+{
+    int rc = find_device(serialNo);
     if (rc == 0) {
-        uninitialize_simulation();
         return 1; // Device not found
     } else if (rc == -1) {
-        uninitialize_simulation();
         return 2; // Error occurred
     }
 
-    rc = initialize();
+    rc = initialize(serialNo);
     if (rc != 0) {
-        uninitialize_simulation();
         return 1;
     }
 
@@ -144,40 +130,40 @@ int connect_device(void)
 }
 
 
-int home_device(void)
+int home_device(const char* serialNo)
 {
     // Home device
     CC_ClearMessageQueue(serialNo);
     
-    CC_Home(serialNo);
+    if (CC_Home(serialNo) != 0) {
+        return 1;
+    }
 
-    wait_for_motor_message(MESSAGE_ID_HOMED); // Wait for homing complete message
-
-    return 0;
+    return wait_for_motor_message(serialNo, MESSAGE_ID_HOMED);
 }
 
 
-int move_position(const double position)
+int move_position(const char* serialNo, double position)
 {
     // move to position (channel 1)
     CC_ClearMessageQueue(serialNo);
 
     // convert to device units
     int device_unit;
-    CC_GetDeviceUnitFromRealValue(serialNo, position, &device_unit, UNIT_TYPE_DISTANCE);
+    if (CC_GetDeviceUnitFromRealValue(serialNo, position, &device_unit, UNIT_TYPE_DISTANCE) != 0) {
+        return 1;
+    }
 
     short rc = CC_MoveToPosition(serialNo, device_unit);
     if (rc != 0) {
         return 1;
     }
 
-    wait_for_motor_message(MESSAGE_ID_MOVED);
-
-    return 0;
+    return wait_for_motor_message(serialNo, MESSAGE_ID_MOVED);
 }
 
 
-double get_position(void)
+double get_position(const char* serialNo)
 {
     int device_unit = CC_GetPosition(serialNo);
     double position_real;
@@ -187,25 +173,7 @@ double get_position(void)
 }
 
 
-int move_relative(const double displacement)
-{
-    CC_ClearMessageQueue(serialNo);
-
-    // convert to device units
-    int device_unit;
-    CC_GetDeviceUnitFromRealValue(serialNo, displacement, &device_unit, UNIT_TYPE_DISTANCE);
-
-    short rc = CC_MoveRelative(serialNo, device_unit);
-    if (rc != 0) {
-        return 1;
-    }
-    wait_for_motor_message(MESSAGE_ID_MOVED);
-
-    return 0;
-}
-
-
-int jog(int direction)
+int jog(const char* serialNo, int direction)
 {
     CC_ClearMessageQueue(serialNo);
 
@@ -227,7 +195,7 @@ int jog(int direction)
         return 1;
     }
 
-    if (wait_for_motor_message(MESSAGE_ID_MOVED) != 0) {
+    if (wait_for_motor_message(serialNo, MESSAGE_ID_MOVED) != 0) {
         return 1;
     }
 
@@ -235,14 +203,44 @@ int jog(int direction)
 }
 
 
-int close_device(void)
+int start_drive(const char* serialNo, int direction)
 {
+    MOT_TravelDirection travelDirection;
+
+    if (direction == 1) {
+        travelDirection = MOT_TravelDirection::MOT_Forwards;
+    } else if (direction == -1) {
+        travelDirection = MOT_TravelDirection::MOT_Backwards;
+    } else {
+        return 1;
+    }
+
+    return CC_MoveAtVelocity(serialNo, travelDirection) == 0 ? 0 : 1;
+}
+
+
+int stop_drive(const char* serialNo)
+{
+    return CC_StopProfiled(serialNo) == 0 ? 0 : 1;
+}
+
+
+int close_device(const char* serialNo)
+{
+    CC_ClearMessageQueue(serialNo);
+
+    int rc = 0;
+
+    // Stop the motor
+    if (CC_StopProfiled(serialNo) != 0 ||
+        wait_for_motor_message(serialNo, MESSAGE_ID_STOPPED) != 0) {
+        rc = 1;
+    }
+
     // Stop polling and close device
     CC_StopPolling(serialNo);
     CC_DisableChannel(serialNo); // Disable the channel before closing
     CC_Close(serialNo);
 
-    uninitialize_simulation();
-
-    return 0;
+    return rc;
 }
