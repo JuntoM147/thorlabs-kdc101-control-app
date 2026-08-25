@@ -4,6 +4,8 @@
         Title="KDC101"
         Height="650"
         Width="800"
+        Deactivated="MainWindow_Deactivated"
+        Closing="MainWindow_Closing"
         Closed="MainWindow_Closed">
 
     <Grid Margin="20">
@@ -31,7 +33,6 @@
                     Name="XStatusText"
                     Text="Status: Disconnected"
                     Margin="0,0,0,15"/>
-
 
                 <!-- Connect -->
                 <Button
@@ -128,7 +129,9 @@
                         Content="◀  Backward"
                         Height="35"
                         IsEnabled="False"
-                        Click="XDriveBackward_Click"/>
+                        PreviewMouseLeftButtonDown="XDriveBackward_Down"
+                        PreviewMouseLeftButtonUp="XDrive_MouseUp"
+                        LostMouseCapture="XDrive_LostMouseCapture"/>
 
                     <Button
                         Name="XDriveForwardButton"
@@ -136,7 +139,9 @@
                         Content="Forward  ▶"
                         Height="35"
                         IsEnabled="False"
-                        Click="XDriveForward_Click"/>
+                        PreviewMouseLeftButtonDown="XDriveForward_Down"
+                        PreviewMouseLeftButtonUp="XDrive_MouseUp"
+                        LostMouseCapture="XDrive_LostMouseCapture"/>
 
                 </Grid>
 
@@ -179,7 +184,6 @@
                     Name="YStatusText"
                     Text="Status: Disconnected"
                     Margin="0,0,0,15"/>
-
 
                 <!-- Connect -->
                 <Button
@@ -276,7 +280,9 @@
                         Content="◀  Backward"
                         Height="35"
                         IsEnabled="False"
-                        Click="YDriveBackward_Click"/>
+                        PreviewMouseLeftButtonDown="YDriveBackward_Down"
+                        PreviewMouseLeftButtonUp="YDrive_MouseUp"
+                        LostMouseCapture="YDrive_LostMouseCapture"/>
 
                     <Button
                         Name="YDriveForwardButton"
@@ -284,7 +290,9 @@
                         Content="Forward  ▶"
                         Height="35"
                         IsEnabled="False"
-                        Click="YDriveForward_Click"/>
+                        PreviewMouseLeftButtonDown="YDriveForward_Down"
+                        PreviewMouseLeftButtonUp="YDrive_MouseUp"
+                        LostMouseCapture="YDrive_LostMouseCapture"/>
 
                 </Grid>
 
@@ -312,4 +320,3 @@
     </Grid>
 
 </Window>
- 
