@@ -173,11 +173,22 @@ double get_position(const char* serialNo)
 }
 
 
-int jog(const char* serialNo, int direction)
+int jog(const char* serialNo, int direction, double displacement)
 {
     CC_ClearMessageQueue(serialNo);
 
+    int deviceUnit;
+    if (CC_GetDeviceUnitFromRealValue(serialNo, displacement, &deviceUnit, UNIT_TYPE_DISTANCE) != 0 ||
+        deviceUnit <= 0) {
+        return 1;
+    }
+
     short rc = CC_SetJogMode(serialNo, MOT_JogModes::MOT_SingleStep, MOT_StopModes::MOT_Profiled);
+    if (rc != 0) {
+        return 1;
+    }
+
+    rc = CC_SetJogStepSize(serialNo, static_cast<unsigned int>(deviceUnit));
     if (rc != 0) {
         return 1;
     }
@@ -186,8 +197,10 @@ int jog(const char* serialNo, int direction)
 
     if (direction == 1) {
         mot_direction = MOT_TravelDirection::MOT_Forwards;
-    } else {
+    } else if (direction == -1) {
         mot_direction = MOT_TravelDirection::MOT_Backwards;
+    } else {
+        return 1;
     }
 
     rc = CC_MoveJog(serialNo, mot_direction);

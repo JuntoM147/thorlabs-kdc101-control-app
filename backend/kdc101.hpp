@@ -13,7 +13,7 @@ extern "C" {
 
     __declspec(dllexport) double get_position(const char* serialNo);
 
-    __declspec(dllexport) int jog(const char* serialNo, int direction);
+    __declspec(dllexport) int jog(const char* serialNo, int direction, double displacement);
 
     __declspec(dllexport) int start_drive(const char* serialNo, int direction);
 
