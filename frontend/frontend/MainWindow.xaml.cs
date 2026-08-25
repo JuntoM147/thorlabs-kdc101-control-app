@@ -136,8 +136,7 @@ namespace frontend
 
                 double current = motor.GetPosition();
 
-                CurrentPositionText.Text =
-                    $"Current position: {current:F3} mm";
+                CurrentPositionText.Text = $"Current position: {current:F3} mm";
             }
             else
             {
@@ -180,4 +179,4 @@ namespace frontend
             JogBackwardButton.IsEnabled = true;
         }
     }
-}
+} // namespace frontend
