@@ -3,13 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="KDC101"
         Height="650"
-        Width="800"
+        Width="1180"
         Deactivated="MainWindow_Deactivated"
         Closing="MainWindow_Closing"
         Closed="MainWindow_Closed">
 
     <Grid Margin="20">
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="20"/>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="20"/>
             <ColumnDefinition Width="*"/>
@@ -39,7 +41,8 @@
                     Name="XConnectButton"
                     Content="Connect"
                     Height="35"
-                    Click="XConnect_Click"
+                    Tag="X"
+                    Click="Connect_Click"
                     Margin="0,0,0,20"/>
 
 
@@ -67,7 +70,8 @@
                         Grid.Column="1"
                         Content="Move Absolute"
                         IsEnabled="False"
-                        Click="XMoveAbsolute_Click"/>
+                        Tag="X"
+                        Click="MoveAbsolute_Click"/>
 
                 </Grid>
 
@@ -97,7 +101,8 @@
                         Content="◀  Jog"
                         Height="35"
                         IsEnabled="False"
-                        Click="XJogBackward_Click"/>
+                        Tag="X"
+                        Click="JogBackward_Click"/>
 
                     <Button
                         Name="XJogForwardButton"
@@ -105,7 +110,8 @@
                         Content="Jog  ▶"
                         Height="35"
                         IsEnabled="False"
-                        Click="XJogForward_Click"/>
+                        Tag="X"
+                        Click="JogForward_Click"/>
 
                 </Grid>
 
@@ -129,9 +135,10 @@
                         Content="◀  Backward"
                         Height="35"
                         IsEnabled="False"
-                        PreviewMouseLeftButtonDown="XDriveBackward_Down"
-                        PreviewMouseLeftButtonUp="XDrive_MouseUp"
-                        LostMouseCapture="XDrive_LostMouseCapture"/>
+                        Tag="X"
+                        PreviewMouseLeftButtonDown="DriveBackward_Down"
+                        PreviewMouseLeftButtonUp="Drive_MouseUp"
+                        LostMouseCapture="Drive_LostMouseCapture"/>
 
                     <Button
                         Name="XDriveForwardButton"
@@ -139,9 +146,10 @@
                         Content="Forward  ▶"
                         Height="35"
                         IsEnabled="False"
-                        PreviewMouseLeftButtonDown="XDriveForward_Down"
-                        PreviewMouseLeftButtonUp="XDrive_MouseUp"
-                        LostMouseCapture="XDrive_LostMouseCapture"/>
+                        Tag="X"
+                        PreviewMouseLeftButtonDown="DriveForward_Down"
+                        PreviewMouseLeftButtonUp="Drive_MouseUp"
+                        LostMouseCapture="Drive_LostMouseCapture"/>
 
                 </Grid>
 
@@ -152,7 +160,8 @@
                     Content="Home"
                     Height="35"
                     IsEnabled="False"
-                    Click="XHome_Click"
+                    Tag="X"
+                    Click="Home_Click"
                     Margin="0,0,0,20"/>
 
 
@@ -190,7 +199,8 @@
                     Name="YConnectButton"
                     Content="Connect"
                     Height="35"
-                    Click="YConnect_Click"
+                    Tag="Y"
+                    Click="Connect_Click"
                     Margin="0,0,0,20"/>
 
 
@@ -218,7 +228,8 @@
                         Grid.Column="1"
                         Content="Move Absolute"
                         IsEnabled="False"
-                        Click="YMoveAbsolute_Click"/>
+                        Tag="Y"
+                        Click="MoveAbsolute_Click"/>
 
                 </Grid>
 
@@ -248,7 +259,8 @@
                         Content="◀  Jog"
                         Height="35"
                         IsEnabled="False"
-                        Click="YJogBackward_Click"/>
+                        Tag="Y"
+                        Click="JogBackward_Click"/>
 
                     <Button
                         Name="YJogForwardButton"
@@ -256,7 +268,8 @@
                         Content="Jog  ▶"
                         Height="35"
                         IsEnabled="False"
-                        Click="YJogForward_Click"/>
+                        Tag="Y"
+                        Click="JogForward_Click"/>
 
                 </Grid>
 
@@ -280,9 +293,10 @@
                         Content="◀  Backward"
                         Height="35"
                         IsEnabled="False"
-                        PreviewMouseLeftButtonDown="YDriveBackward_Down"
-                        PreviewMouseLeftButtonUp="YDrive_MouseUp"
-                        LostMouseCapture="YDrive_LostMouseCapture"/>
+                        Tag="Y"
+                        PreviewMouseLeftButtonDown="DriveBackward_Down"
+                        PreviewMouseLeftButtonUp="Drive_MouseUp"
+                        LostMouseCapture="Drive_LostMouseCapture"/>
 
                     <Button
                         Name="YDriveForwardButton"
@@ -290,9 +304,10 @@
                         Content="Forward  ▶"
                         Height="35"
                         IsEnabled="False"
-                        PreviewMouseLeftButtonDown="YDriveForward_Down"
-                        PreviewMouseLeftButtonUp="YDrive_MouseUp"
-                        LostMouseCapture="YDrive_LostMouseCapture"/>
+                        Tag="Y"
+                        PreviewMouseLeftButtonDown="DriveForward_Down"
+                        PreviewMouseLeftButtonUp="Drive_MouseUp"
+                        LostMouseCapture="Drive_LostMouseCapture"/>
 
                 </Grid>
 
@@ -303,7 +318,8 @@
                     Content="Home"
                     Height="35"
                     IsEnabled="False"
-                    Click="YHome_Click"
+                    Tag="Y"
+                    Click="Home_Click"
                     Margin="0,0,0,20"/>
 
 
@@ -315,6 +331,79 @@
 
             </StackPanel>
 
+        </GroupBox>
+
+
+        <!-- ===================================================== -->
+        <!--                    Z AXIS                             -->
+        <!-- ===================================================== -->
+
+        <GroupBox
+            Grid.Column="4"
+            Header="Z Axis"
+            FontSize="16"
+            Padding="15">
+
+            <StackPanel>
+                <TextBlock Name="ZStatusText" Text="Status: Disconnected" Margin="0,0,0,15"/>
+
+                <Button Name="ZConnectButton" Content="Connect" Height="35"
+                        Tag="Z" Click="Connect_Click" Margin="0,0,0,20"/>
+
+                <TextBlock Text="Position (mm)" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="130"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Name="ZPositionBox" Grid.Column="0" Text="10.0"
+                             IsEnabled="False" Margin="0,0,10,0"/>
+                    <Button Name="ZMoveButton" Grid.Column="1" Content="Move Absolute"
+                            IsEnabled="False" Tag="Z" Click="MoveAbsolute_Click"/>
+                </Grid>
+
+                <TextBlock Text="Jog displacement (mm)" Margin="0,0,0,5"/>
+                <TextBox Name="ZJogDisplacementBox" Text="1.0" IsEnabled="False"
+                         Margin="0,0,0,10"/>
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Name="ZJogBackwardButton" Grid.Column="0" Content="◀  Jog"
+                            Height="35" IsEnabled="False" Tag="Z" Click="JogBackward_Click"/>
+                    <Button Name="ZJogForwardButton" Grid.Column="2" Content="Jog  ▶"
+                            Height="35" IsEnabled="False" Tag="Z" Click="JogForward_Click"/>
+                </Grid>
+
+                <TextBlock Text="Drive" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Name="ZDriveBackwardButton" Grid.Column="0" Content="◀  Backward"
+                            Height="35" IsEnabled="False"
+                            Tag="Z"
+                            PreviewMouseLeftButtonDown="DriveBackward_Down"
+                            PreviewMouseLeftButtonUp="Drive_MouseUp"
+                            LostMouseCapture="Drive_LostMouseCapture"/>
+                    <Button Name="ZDriveForwardButton" Grid.Column="2" Content="Forward  ▶"
+                            Height="35" IsEnabled="False"
+                            Tag="Z"
+                            PreviewMouseLeftButtonDown="DriveForward_Down"
+                            PreviewMouseLeftButtonUp="Drive_MouseUp"
+                            LostMouseCapture="Drive_LostMouseCapture"/>
+                </Grid>
+
+                <Button Name="ZHomeButton" Content="Home" Height="35" IsEnabled="False"
+                        Tag="Z" Click="Home_Click" Margin="0,0,0,20"/>
+
+                <TextBlock Name="ZCurrentPositionText" Text="Current position: -- mm"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
         </GroupBox>
 
     </Grid>

@@ -96,7 +96,7 @@ int initialize(const char* serialNo)
         return 1;
     }
 
-    if (!CC_LoadSettings(serialNo)) {
+    if (!CC_LoadSettings(serialNo) && !CC_LoadNamedSettings(serialNo, "Z825")) {
         CC_Close(serialNo);
         return 1;
     }

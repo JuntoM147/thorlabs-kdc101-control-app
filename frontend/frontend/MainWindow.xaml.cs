@@ -8,27 +8,56 @@ namespace frontend
 {
     public partial class MainWindow : Window
     {
-        private readonly MotorController xMotor = new("27000001");
-        private readonly MotorController yMotor = new("27000002");
-        private readonly DispatcherTimer positionTimer;
+        private sealed class AxisState(MotorController motor, TextBlock statusText, Button connectButton, TextBox positionBox, TextBox jogDisplacementBox, TextBlock currentPositionText, params Control[] movementControls)
+        {
+            public MotorController Motor { get; } = motor;
+            public TextBlock StatusText { get; } = statusText;
+            public Button ConnectButton { get; } = connectButton;
+            public TextBox PositionBox { get; } = positionBox;
+            public TextBox JogDisplacementBox { get; } = jogDisplacementBox;
+            public TextBlock CurrentPositionText { get; } = currentPositionText;
+            public Control[] MovementControls { get; } = movementControls;
+            public bool Connected { get; set; }
+            public bool Driving { get; set; }
 
-        private bool xConnected;
-        private bool yConnected;
-        private bool xDriving;
-        private bool yDriving;
+            public void SetMovementEnabled(bool enabled)
+            {
+                PositionBox.IsEnabled = enabled;
+                JogDisplacementBox.IsEnabled = enabled;
+
+                foreach (Control control in MovementControls)
+                {
+                    control.IsEnabled = enabled;
+                }
+            }
+        }
+
+        private readonly Dictionary<string, AxisState> axes;
+        private readonly DispatcherTimer positionTimer;
         private int activeMovementCommands;
 
         public MainWindow()
         {
             InitializeComponent();
 
-            positionTimer = new DispatcherTimer
+            axes = new Dictionary<string, AxisState>
             {
-                Interval = TimeSpan.FromSeconds(1)
+                ["X"] = CreateAxis("27000001", XStatusText, XConnectButton, XPositionBox, XJogDisplacementBox, XCurrentPositionText, XMoveButton, XJogBackwardButton, XJogForwardButton, XDriveBackwardButton, XDriveForwardButton, XHomeButton),
+                ["Y"] = CreateAxis("27000002", YStatusText, YConnectButton, YPositionBox, YJogDisplacementBox, YCurrentPositionText, YMoveButton, YJogBackwardButton, YJogForwardButton, YDriveBackwardButton, YDriveForwardButton, YHomeButton),
+                ["Z"] = CreateAxis("27000003", ZStatusText, ZConnectButton, ZPositionBox, ZJogDisplacementBox, ZCurrentPositionText, ZMoveButton, ZJogBackwardButton, ZJogForwardButton, ZDriveBackwardButton, ZDriveForwardButton, ZHomeButton)
             };
 
+            positionTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             positionTimer.Tick += UpdatePositions;
             positionTimer.Start();
+        }
+
+        private static AxisState CreateAxis(string serialNumber, TextBlock statusText, Button connectButton, TextBox positionBox, TextBox jogDisplacementBox, TextBlock currentPositionText, params Control[] movementControls) => new(new MotorController(serialNumber), statusText, connectButton, positionBox, jogDisplacementBox, currentPositionText, movementControls);
+
+        private AxisState GetAxis(object sender)
+        {
+            string axisName = (string)((FrameworkElement)sender).Tag;
+            return axes[axisName];
         }
 
         private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -43,140 +72,92 @@ namespace frontend
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
             positionTimer.Stop();
-
-            if (xConnected)
+            foreach (AxisState axis in axes.Values.Where(axis => axis.Connected))
             {
-                xMotor.Close();
-            }
-
-            if (yConnected)
-            {
-                yMotor.Close();
+                axis.Motor.Close();
             }
         }
 
         private void MainWindow_Deactivated(object? sender, EventArgs e)
         {
-            StopXDrive();
-            StopYDrive();
+            foreach (AxisState axis in axes.Values)
+            {
+                StopDrive(axis);
+            }
         }
 
         private void UpdatePositions(object? sender, EventArgs e)
         {
-            if (xConnected)
+            foreach (AxisState axis in axes.Values.Where(axis => axis.Connected))
             {
-                UpdatePosition(xMotor, XCurrentPositionText);
-            }
-
-            if (yConnected)
-            {
-                UpdatePosition(yMotor, YCurrentPositionText);
+                UpdatePosition(axis);
             }
         }
 
-        private static void UpdatePosition(MotorController motor, TextBlock positionText)
+        private static void UpdatePosition(AxisState axis)
         {
-            double position = motor.GetPosition();
-            positionText.Text = $"Current position: {position:F3} mm";
+            double position = axis.Motor.GetPosition();
+            axis.CurrentPositionText.Text = $"Current position: {position:F3} mm";
         }
 
-        private void XConnect_Click(object sender, RoutedEventArgs e)
+        private void Connect_Click(object sender, RoutedEventArgs e)
         {
-            int rc = xMotor.Connect();
+            AxisState axis = GetAxis(sender);
+            int rc = axis.Motor.Connect();
 
             if (rc == 0)
             {
-                xConnected = true;
-                XStatusText.Text = "Status: Connected";
-                XConnectButton.IsEnabled = false;
-                SetXMovementEnabled(true);
-                UpdatePosition(xMotor, XCurrentPositionText);
+                axis.Connected = true;
+                axis.StatusText.Text = "Status: Connected";
+                axis.ConnectButton.IsEnabled = false;
+                axis.SetMovementEnabled(true);
+                UpdatePosition(axis);
             }
             else
             {
-                XStatusText.Text = $"Status: Connection failed ({rc})";
+                axis.StatusText.Text = $"Status: Connection failed ({rc})";
             }
         }
 
-        private void YConnect_Click(object sender, RoutedEventArgs e)
+        private async void MoveAbsolute_Click(object sender, RoutedEventArgs e)
         {
-            int rc = yMotor.Connect();
-
-            if (rc == 0)
+            AxisState axis = GetAxis(sender);
+            if (!double.TryParse(axis.PositionBox.Text, out double position))
             {
-                yConnected = true;
-                YStatusText.Text = "Status: Connected";
-                YConnectButton.IsEnabled = false;
-                SetYMovementEnabled(true);
-                UpdatePosition(yMotor, YCurrentPositionText);
-            }
-            else
-            {
-                YStatusText.Text = $"Status: Connection failed ({rc})";
-            }
-        }
-
-        private async void XMoveAbsolute_Click(object sender, RoutedEventArgs e)
-        {
-            if (!double.TryParse(XPositionBox.Text, out double position))
-            {
-                XStatusText.Text = "Status: Invalid position";
+                axis.StatusText.Text = "Status: Invalid position";
                 return;
             }
 
-            await ExecuteMovement(() => xMotor.MoveAbsolute(position), xMotor, XStatusText, XCurrentPositionText, SetXMovementEnabled, "Moving...");
+            await ExecuteMovement(axis, () => axis.Motor.MoveAbsolute(position), "Moving...");
         }
 
-        private async void YMoveAbsolute_Click(object sender, RoutedEventArgs e)
+        private async void JogForward_Click(object sender, RoutedEventArgs e) =>
+            await Jog(GetAxis(sender), 1);
+
+        private async void JogBackward_Click(object sender, RoutedEventArgs e) =>
+            await Jog(GetAxis(sender), -1);
+
+        private async Task Jog(AxisState axis, int direction)
         {
-            if (!double.TryParse(YPositionBox.Text, out double position))
+            if (!double.TryParse(axis.JogDisplacementBox.Text, out double displacement) || displacement <= 0)
             {
-                YStatusText.Text = "Status: Invalid position";
+                axis.StatusText.Text = "Status: Invalid jog displacement";
                 return;
             }
 
-            await ExecuteMovement(() => yMotor.MoveAbsolute(position), yMotor, YStatusText, YCurrentPositionText, SetYMovementEnabled, "Moving...");
+            await ExecuteMovement(axis, () => axis.Motor.Jog(direction, displacement), "Jogging...");
         }
 
-        private async void XJogForward_Click(object sender, RoutedEventArgs e) =>
-            await Jog(xMotor, 1, XJogDisplacementBox, XStatusText, XCurrentPositionText, SetXMovementEnabled);
-
-        private async void XJogBackward_Click(object sender, RoutedEventArgs e) =>
-            await Jog(xMotor, -1, XJogDisplacementBox, XStatusText, XCurrentPositionText, SetXMovementEnabled);
-
-        private async void YJogForward_Click(object sender, RoutedEventArgs e) =>
-            await Jog(yMotor, 1, YJogDisplacementBox, YStatusText, YCurrentPositionText, SetYMovementEnabled);
-
-        private async void YJogBackward_Click(object sender, RoutedEventArgs e) =>
-            await Jog(yMotor, -1, YJogDisplacementBox, YStatusText, YCurrentPositionText, SetYMovementEnabled);
-
-        private async Task Jog(
-            MotorController motor,
-            int direction,
-            TextBox displacementBox,
-            TextBlock statusText,
-            TextBlock positionText,
-            Action<bool> setMovementEnabled)
+        private async void Home_Click(object sender, RoutedEventArgs e)
         {
-            if (!double.TryParse(displacementBox.Text, out double displacement) || displacement <= 0)
-            {
-                statusText.Text = "Status: Invalid jog displacement";
-                return;
-            }
-
-            await ExecuteMovement(() => motor.Jog(direction, displacement), motor, statusText, positionText, setMovementEnabled, "Jogging...");
+            AxisState axis = GetAxis(sender);
+            await ExecuteMovement(axis, axis.Motor.Home, "Homing...");
         }
 
-        private async void XHome_Click(object sender, RoutedEventArgs e) =>
-            await ExecuteMovement(xMotor.Home, xMotor, XStatusText, XCurrentPositionText, SetXMovementEnabled, "Homing...");
-
-        private async void YHome_Click(object sender, RoutedEventArgs e) =>
-            await ExecuteMovement(yMotor.Home, yMotor, YStatusText, YCurrentPositionText, SetYMovementEnabled, "Homing...");
-
-        private async Task ExecuteMovement(Func<int> command, MotorController motor, TextBlock statusText, TextBlock positionText, Action<bool> setMovementEnabled, string activity)
+        private async Task ExecuteMovement(AxisState axis, Func<int> command, string activity)
         {
-            setMovementEnabled(false);
-            statusText.Text = $"Status: {activity}";
+            axis.SetMovementEnabled(false);
+            axis.StatusText.Text = $"Status: {activity}";
             activeMovementCommands++;
 
             int rc;
@@ -187,117 +168,67 @@ namespace frontend
             finally
             {
                 activeMovementCommands--;
-                setMovementEnabled(true);
+                axis.SetMovementEnabled(true);
             }
 
             if (rc == 0)
             {
-                statusText.Text = "Status: Ready";
-                UpdatePosition(motor, positionText);
+                axis.StatusText.Text = "Status: Ready";
+                UpdatePosition(axis);
             }
             else
             {
-                statusText.Text = $"Status: Motor command failed ({rc})";
+                axis.StatusText.Text = $"Status: Motor command failed ({rc})";
             }
         }
 
-        private void XDriveBackward_Down(object sender, MouseButtonEventArgs e) =>
-            StartDrive(xMotor, -1, ref xDriving, XStatusText);
+        private void DriveBackward_Down(object sender, MouseButtonEventArgs e) =>
+            StartDrive(GetAxis(sender), -1);
 
-        private void XDriveForward_Down(object sender, MouseButtonEventArgs e) =>
-            StartDrive(xMotor, 1, ref xDriving, XStatusText);
+        private void DriveForward_Down(object sender, MouseButtonEventArgs e) =>
+            StartDrive(GetAxis(sender), 1);
 
-        private void YDriveBackward_Down(object sender, MouseButtonEventArgs e) =>
-            StartDrive(yMotor, -1, ref yDriving, YStatusText);
+        private void Drive_MouseUp(object sender, MouseButtonEventArgs e) => StopDrive(GetAxis(sender));
 
-        private void YDriveForward_Down(object sender, MouseButtonEventArgs e) =>
-            StartDrive(yMotor, 1, ref yDriving, YStatusText);
+        private void Drive_LostMouseCapture(object sender, MouseEventArgs e) => StopDrive(GetAxis(sender));
 
-        private void XDrive_MouseUp(object sender, MouseButtonEventArgs e) => StopXDrive();
-
-        private void YDrive_MouseUp(object sender, MouseButtonEventArgs e) => StopYDrive();
-
-        private void XDrive_LostMouseCapture(object sender, MouseEventArgs e) => StopXDrive();
-
-        private void YDrive_LostMouseCapture(object sender, MouseEventArgs e) => StopYDrive();
-
-        private static void StartDrive(
-            MotorController motor,
-            int direction,
-            ref bool driving,
-            TextBlock statusText)
+        private static void StartDrive(AxisState axis, int direction)
         {
-            if (driving)
+            if (axis.Driving)
             {
                 return;
             }
 
-            int rc = motor.StartDrive(direction);
-
+            int rc = axis.Motor.StartDrive(direction);
             if (rc == 0)
             {
-                driving = true;
-                statusText.Text = "Status: Driving...";
+                axis.Driving = true;
+                axis.StatusText.Text = "Status: Driving...";
             }
             else
             {
-                statusText.Text = $"Status: Drive failed ({rc})";
+                axis.StatusText.Text = $"Status: Drive failed ({rc})";
             }
         }
 
-        private void StopXDrive() =>
-            StopDrive(xMotor, ref xDriving, XStatusText, XCurrentPositionText);
-
-        private void StopYDrive() =>
-            StopDrive(yMotor, ref yDriving, YStatusText, YCurrentPositionText);
-
-        private static void StopDrive(
-            MotorController motor,
-            ref bool driving,
-            TextBlock statusText,
-            TextBlock positionText)
+        private static void StopDrive(AxisState axis)
         {
-            if (!driving)
+            if (!axis.Driving)
             {
                 return;
             }
 
-            driving = false;
-            int rc = motor.StopDrive();
-
+            axis.Driving = false;
+            int rc = axis.Motor.StopDrive();
             if (rc == 0)
             {
-                statusText.Text = "Status: Ready";
-                UpdatePosition(motor, positionText);
+                axis.StatusText.Text = "Status: Ready";
+                UpdatePosition(axis);
             }
             else
             {
-                statusText.Text = $"Status: Stop failed ({rc})";
+                axis.StatusText.Text = $"Status: Stop failed ({rc})";
             }
-        }
-
-        private void SetXMovementEnabled(bool enabled)
-        {
-            XPositionBox.IsEnabled = enabled;
-            XJogDisplacementBox.IsEnabled = enabled;
-            XMoveButton.IsEnabled = enabled;
-            XJogBackwardButton.IsEnabled = enabled;
-            XJogForwardButton.IsEnabled = enabled;
-            XDriveBackwardButton.IsEnabled = enabled;
-            XDriveForwardButton.IsEnabled = enabled;
-            XHomeButton.IsEnabled = enabled;
-        }
-
-        private void SetYMovementEnabled(bool enabled)
-        {
-            YPositionBox.IsEnabled = enabled;
-            YJogDisplacementBox.IsEnabled = enabled;
-            YMoveButton.IsEnabled = enabled;
-            YJogBackwardButton.IsEnabled = enabled;
-            YJogForwardButton.IsEnabled = enabled;
-            YDriveBackwardButton.IsEnabled = enabled;
-            YDriveForwardButton.IsEnabled = enabled;
-            YHomeButton.IsEnabled = enabled;
         }
     }
 }
