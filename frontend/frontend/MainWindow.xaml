@@ -2,18 +2,19 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="KDC101"
-        Height="650"
-        Width="1180"
+        Height="780"
+        Width="1500"
+        MinWidth="1250"
         Deactivated="MainWindow_Deactivated"
         Closing="MainWindow_Closing"
         Closed="MainWindow_Closed">
 
-    <Grid Margin="20">
+    <Grid Margin="30,20">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="30"/>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="20"/>
+            <ColumnDefinition Width="30"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
@@ -26,7 +27,7 @@
             Grid.Column="0"
             Header="X Axis"
             FontSize="16"
-            Padding="15">
+            Padding="20,15">
 
             <StackPanel>
 
@@ -47,81 +48,71 @@
 
 
                 <!-- Absolute move -->
-                <TextBlock
-                    Text="Position (mm)"
-                    Margin="0,0,0,5"/>
-
-                <Grid Margin="0,0,0,20">
-
+                <TextBlock Text="Move Absolute" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="130"/>
                     </Grid.ColumnDefinitions>
-
-                    <TextBox
-                        Name="XPositionBox"
-                        Grid.Column="0"
-                        Text="10.0"
-                        IsEnabled="False"
-                        Margin="0,0,10,0"/>
-
-                    <Button
-                        Name="XMoveButton"
-                        Grid.Column="1"
-                        Content="Move Absolute"
-                        IsEnabled="False"
-                        Tag="X"
-                        Click="MoveAbsolute_Click"/>
-
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Position (mm)" Margin="0,0,0,4"/>
+                        <TextBox Name="XPositionBox" Text="10.0" IsEnabled="False"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="XMoveSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=XMoveButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Accel. (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="XMoveAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=XMoveButton}"/>
+                    </StackPanel>
                 </Grid>
-
+                <Button Name="XMoveButton" Content="Move Absolute" Height="35" IsEnabled="False"
+                        Tag="X" Click="MoveAbsolute_Click" Margin="0,0,0,24"/>
 
                 <!-- Jog -->
-                <TextBlock
-                    Text="Jog displacement (mm)"
-                    Margin="0,0,0,5"/>
-
-                <TextBox
-                    Name="XJogDisplacementBox"
-                    Text="1.0"
-                    IsEnabled="False"
-                    Margin="0,0,0,10"/>
-
-                <Grid Margin="0,0,0,20">
-
+                <TextBlock Text="Jog" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
-                    <Button
-                        Name="XJogBackwardButton"
-                        Grid.Column="0"
-                        Content="◀  Jog"
-                        Height="35"
-                        IsEnabled="False"
-                        Tag="X"
-                        Click="JogBackward_Click"/>
-
-                    <Button
-                        Name="XJogForwardButton"
-                        Grid.Column="2"
-                        Content="Jog  ▶"
-                        Height="35"
-                        IsEnabled="False"
-                        Tag="X"
-                        Click="JogForward_Click"/>
-
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Distance (mm)" Margin="0,0,0,4"/>
+                        <TextBox Name="XJogDisplacementBox" Text="1.0" IsEnabled="False"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="XJogSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=XJogForwardButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Accel. (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="XJogAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=XJogForwardButton}"/>
+                    </StackPanel>
+                </Grid>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button Name="XJogBackwardButton" Grid.Column="0" Content="◀  Backward" Height="35" IsEnabled="False" Tag="X" Click="JogBackward_Click"/>
+                    <Button Name="XJogForwardButton" Grid.Column="2" Content="Forward  ▶" Height="35" IsEnabled="False" Tag="X" Click="JogForward_Click"/>
                 </Grid>
 
-
                 <!-- Continuous drive -->
-                <TextBlock
-                    Text="Drive"
-                    Margin="0,0,0,5"/>
+                <TextBlock Text="Drive" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="XDriveSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=XDriveForwardButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Acceleration (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="XDriveAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=XDriveForwardButton}"/>
+                    </StackPanel>
+                </Grid>
 
-                <Grid Margin="0,0,0,20">
+                <Grid Margin="0,0,0,16">
 
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -184,7 +175,7 @@
             Grid.Column="2"
             Header="Y Axis"
             FontSize="16"
-            Padding="15">
+            Padding="20,15">
 
             <StackPanel>
 
@@ -205,81 +196,71 @@
 
 
                 <!-- Absolute move -->
-                <TextBlock
-                    Text="Position (mm)"
-                    Margin="0,0,0,5"/>
-
-                <Grid Margin="0,0,0,20">
-
+                <TextBlock Text="Move Absolute" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="130"/>
                     </Grid.ColumnDefinitions>
-
-                    <TextBox
-                        Name="YPositionBox"
-                        Grid.Column="0"
-                        Text="10.0"
-                        IsEnabled="False"
-                        Margin="0,0,10,0"/>
-
-                    <Button
-                        Name="YMoveButton"
-                        Grid.Column="1"
-                        Content="Move Absolute"
-                        IsEnabled="False"
-                        Tag="Y"
-                        Click="MoveAbsolute_Click"/>
-
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Position (mm)" Margin="0,0,0,4"/>
+                        <TextBox Name="YPositionBox" Text="10.0" IsEnabled="False"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="YMoveSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=YMoveButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Accel. (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="YMoveAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=YMoveButton}"/>
+                    </StackPanel>
                 </Grid>
-
+                <Button Name="YMoveButton" Content="Move Absolute" Height="35" IsEnabled="False"
+                        Tag="Y" Click="MoveAbsolute_Click" Margin="0,0,0,24"/>
 
                 <!-- Jog -->
-                <TextBlock
-                    Text="Jog displacement (mm)"
-                    Margin="0,0,0,5"/>
-
-                <TextBox
-                    Name="YJogDisplacementBox"
-                    Text="1.0"
-                    IsEnabled="False"
-                    Margin="0,0,0,10"/>
-
-                <Grid Margin="0,0,0,20">
-
+                <TextBlock Text="Jog" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-
-                    <Button
-                        Name="YJogBackwardButton"
-                        Grid.Column="0"
-                        Content="◀  Jog"
-                        Height="35"
-                        IsEnabled="False"
-                        Tag="Y"
-                        Click="JogBackward_Click"/>
-
-                    <Button
-                        Name="YJogForwardButton"
-                        Grid.Column="2"
-                        Content="Jog  ▶"
-                        Height="35"
-                        IsEnabled="False"
-                        Tag="Y"
-                        Click="JogForward_Click"/>
-
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Distance (mm)" Margin="0,0,0,4"/>
+                        <TextBox Name="YJogDisplacementBox" Text="1.0" IsEnabled="False"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="YJogSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=YJogForwardButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Accel. (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="YJogAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=YJogForwardButton}"/>
+                    </StackPanel>
+                </Grid>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button Name="YJogBackwardButton" Grid.Column="0" Content="◀  Backward" Height="35" IsEnabled="False" Tag="Y" Click="JogBackward_Click"/>
+                    <Button Name="YJogForwardButton" Grid.Column="2" Content="Forward  ▶" Height="35" IsEnabled="False" Tag="Y" Click="JogForward_Click"/>
                 </Grid>
 
-
                 <!-- Drive -->
-                <TextBlock
-                    Text="Drive"
-                    Margin="0,0,0,5"/>
+                <TextBlock Text="Drive" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="YDriveSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=YDriveForwardButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Acceleration (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="YDriveAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=YDriveForwardButton}"/>
+                    </StackPanel>
+                </Grid>
 
-                <Grid Margin="0,0,0,20">
+                <Grid Margin="0,0,0,16">
 
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -342,7 +323,7 @@
             Grid.Column="4"
             Header="Z Axis"
             FontSize="16"
-            Padding="15">
+            Padding="20,15">
 
             <StackPanel>
                 <TextBlock Name="ZStatusText" Text="Status: Disconnected" Margin="0,0,0,15"/>
@@ -350,35 +331,68 @@
                 <Button Name="ZConnectButton" Content="Connect" Height="35"
                         Tag="Z" Click="Connect_Click" Margin="0,0,0,20"/>
 
-                <TextBlock Text="Position (mm)" Margin="0,0,0,5"/>
-                <Grid Margin="0,0,0,20">
+                <TextBlock Text="Move Absolute" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="130"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox Name="ZPositionBox" Grid.Column="0" Text="10.0"
-                             IsEnabled="False" Margin="0,0,10,0"/>
-                    <Button Name="ZMoveButton" Grid.Column="1" Content="Move Absolute"
-                            IsEnabled="False" Tag="Z" Click="MoveAbsolute_Click"/>
-                </Grid>
-
-                <TextBlock Text="Jog displacement (mm)" Margin="0,0,0,5"/>
-                <TextBox Name="ZJogDisplacementBox" Text="1.0" IsEnabled="False"
-                         Margin="0,0,0,10"/>
-                <Grid Margin="0,0,0,20">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Button Name="ZJogBackwardButton" Grid.Column="0" Content="◀  Jog"
-                            Height="35" IsEnabled="False" Tag="Z" Click="JogBackward_Click"/>
-                    <Button Name="ZJogForwardButton" Grid.Column="2" Content="Jog  ▶"
-                            Height="35" IsEnabled="False" Tag="Z" Click="JogForward_Click"/>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Position (mm)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZPositionBox" Text="10.0" IsEnabled="False"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZMoveSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=ZMoveButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Accel. (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZMoveAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=ZMoveButton}"/>
+                    </StackPanel>
+                </Grid>
+                <Button Name="ZMoveButton" Content="Move Absolute" Height="35" IsEnabled="False"
+                        Tag="Z" Click="MoveAbsolute_Click" Margin="0,0,0,24"/>
+
+                <TextBlock Text="Jog" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Distance (mm)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZJogDisplacementBox" Text="1.0" IsEnabled="False"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZJogSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=ZJogForwardButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="Accel. (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZJogAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=ZJogForwardButton}"/>
+                    </StackPanel>
+                </Grid>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <Button Name="ZJogBackwardButton" Grid.Column="0" Content="◀  Backward" Height="35" IsEnabled="False" Tag="Z" Click="JogBackward_Click"/>
+                    <Button Name="ZJogForwardButton" Grid.Column="2" Content="Forward  ▶" Height="35" IsEnabled="False" Tag="Z" Click="JogForward_Click"/>
                 </Grid>
 
-                <TextBlock Text="Drive" Margin="0,0,0,5"/>
-                <Grid Margin="0,0,0,20">
+                <TextBlock Text="Drive" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Speed (mm/s)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZDriveSpeedBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=ZDriveForwardButton}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Acceleration (mm/s²)" Margin="0,0,0,4"/>
+                        <TextBox Name="ZDriveAccelerationBox" Text="1.0" IsEnabled="{Binding IsEnabled, ElementName=ZDriveForwardButton}"/>
+                    </StackPanel>
+                </Grid>
+                <Grid Margin="0,0,0,16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="10"/>
