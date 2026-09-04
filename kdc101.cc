@@ -8,6 +8,7 @@
 #endif // KDC101_H_
 
 namespace thorlabs {
+
 constexpr int kDeviceID = 27;
 
 } // thorlabs
