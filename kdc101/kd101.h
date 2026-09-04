@@ -1,48 +1,52 @@
-#ifndef DEVICE_ERROR_H_
-#define DEVICE_ERROR_H_
+#ifndef KDC101_H_
+#define KDC101_H_
 
-#include "device_error.h"
+#include "kdc101/kdc101.h"
 
-#endif // DEVICE_ERROR_H_
-
+#include "device_error/device_error.h"
+#include "Thorlabs.MotionControl.KCube.DCServo.h"
 
 namespace thorlabs {
 
 enum class Direction {
     kForwards = 0,
-    kBackwards;
+    kBackwards
+};
+
+enum class StopMode {
+    kStopProfiled,
+    kStopImmediate
 };
 
 constexpr double kDefaultSpeed = 0.0;
 constexpr double kDefaultAcceleration = 0.0;
 constexpr double kDefaultStepSize = 0.0;
 constexpr int kDefaultPollingRate = 200;
-constexpr bool kDefaultSimulationStatus = true;
 
 class KDC101 {
     public:
         KDC101() = delete;
 
-        explicit KDC101(std::string serial_number, int polling_rate = kDefaultPollingRate, bool simulation_status = kDefaultSimulationStatus);
+        ~KDC101();
 
-        DeviceError Home(double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        explicit KDC101(std::string serial_number, int polling_interval_ms = kDefaultPollingRate, bool simulation = false);
 
-        DeviceError Jog(Direction dir, double step_size = kDefaultStepSize, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceError Home(double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
-        DeviceError StartDrive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceError Jog(Direction dir, double step_size = kDefaultStepSize, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
-        DeviceError StopDrive();
+        [[nodiscard]] DeviceError StartDrive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
-        DeviceError MoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceError Stop(StopMode stop_mode = StopMode::kStopProfiled);
 
-        void Abort();
-
-        ~KDC101() {}
+        [[nodiscard]] DeviceError MoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
     private:
         const std::string serial_number;
-        bool is_simulation_;
+        bool simulation_;
 };
 
 } // namespace thorlabs 
+
+#endif // KDC101_H_
 

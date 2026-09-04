@@ -1,17 +1,19 @@
-#ifndef DEVICE_ERROR_H_
-#define DEVICE_ERROR_H_
+#include "device_error/device_error.h"
 
-#include "device_error.h"
-
-#endif // DEVICE_ERROR_H_
+#include <string>
  
 
 namespace thorlabs {
 
-DeviceError::DeviceError(int error_code) // TODO error_code is actually short type
+DeviceError::DeviceError(int error_code) : error_code_ {error_code}
 {
     switch (error_code)
     {
+        case 0:
+            error_message_ = "Success.";
+            break;
+
+
         // FTDI and communication errors
         case 1:
             error_message_ = "FT_InvalidHandle: The FTDI functions have not been initialized.";
@@ -144,7 +146,6 @@ DeviceError::DeviceError(int error_code) // TODO error_code is actually short ty
             error_message_ = "Unknown Kinesis error code: " + std::to_string(error_code);
             break;
     }
-}
 }
 
 } // namespace thorlabs

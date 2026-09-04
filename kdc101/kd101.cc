@@ -1,17 +1,57 @@
-#ifndef KDC101_H_
-#define KDC101_H_
+#include "kdc101/kdc101.h"
 
-#include "kdc101.h"
-
-#include "Thorlabs.MotionControl.KCube.DCServo.h"
-
-#endif // KDC101_H_
+#include "device_error/device_error.h"
 
 namespace thorlabs {
 
-constexpr int kDeviceID = 27;
+constexpr int kDeviceID = 27; // KDC101 Device ID (from Thorlabs Kinesis C API)
 
 namespace {
+
+DeviceError find_device(const char* serialNo)
+{   
+    DeviceError rc(TLI_BuildDeviceList());
+    if (!rc.Ok())
+    {
+        return rc;
+    }
+
+    // get KDC serial numbers
+    char serialNumbers[250];
+    TLI_GetDeviceListByTypeExt(serialNumbers, 250, kDeviceID);     // Get the device list which are dc servos
+
+    // output list of matching devices
+    char *searchContext = NULL;
+    char *p = strtok_s(serialNumbers, ",", &searchContext);
+
+    int found = 0;
+
+    while (p != NULL)
+    {
+        TLI_DeviceInfo deviceInfo;
+
+        // get device info from device
+        TLI_GetDeviceInfo(p, &deviceInfo);
+
+        // get strings from device info structure
+        char curr_desc[65];
+        strncpy_s(curr_desc, deviceInfo.description, 64);
+        curr_desc[64] = '\0';
+
+        char curr_serialNo[9];
+        strncpy_s(curr_serialNo, deviceInfo.serialNo, 8);
+        curr_serialNo[8] = '\0';
+
+        if (strncmp(curr_serialNo, serialNo, 8) == 0) {
+            found = 1;
+        }
+
+        // output
+        p = strtok_s(NULL, ",", &searchContext);
+    }
+
+    return found;
+}
 
 int wait_for_motor_message(const char* serial_number_.c_str(), WORD expectedMessageId)
 {
