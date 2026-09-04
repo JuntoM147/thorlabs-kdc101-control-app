@@ -4,6 +4,8 @@ namespace thorlabs {
 
 class DeviceError {
     public:
+        DeviceError() = delete;
+
         explicit DeviceError(int error_code);
 
         std::string ErrMessage() const {return error_message_;}

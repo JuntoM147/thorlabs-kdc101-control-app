@@ -17,18 +17,21 @@ constexpr double kDefaultSpeed = 0.0;
 constexpr double kDefaultAcceleration = 0.0;
 constexpr double kDefaultStepSize = 0.0;
 constexpr int kDefaultPollingRate = 200;
+constexpr bool kDefaultSimulationStatus = true;
 
 class KDC101 {
     public:
         KDC101() = delete;
 
-        explicit KDC101(int serial_number, int polling_rate = kDefaultPollingRate) : serial_number_{serial_number} {}
+        explicit KDC101(std::string serial_number, int polling_rate = kDefaultPollingRate, bool simulation_status = kDefaultSimulationStatus);
 
         DeviceError Home(double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
         DeviceError Jog(Direction dir, double step_size = kDefaultStepSize, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
-        DeviceError Drive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        DeviceError StartDrive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+
+        DeviceError StopDrive();
 
         DeviceError MoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
@@ -37,8 +40,9 @@ class KDC101 {
         ~KDC101() {}
 
     private:
-        const int serial_number_;
+        const std::string serial_number;
+        bool is_simulation_;
 };
 
-} // thorlabs 
+} // namespace thorlabs 
 
