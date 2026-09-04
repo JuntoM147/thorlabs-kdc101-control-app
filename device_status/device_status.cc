@@ -1,11 +1,11 @@
-#include "device_error/device_error.h"
+#include "device_status.h"
 
 #include <string>
  
 
 namespace thorlabs {
 
-DeviceError::DeviceError(int error_code) : error_code_ {error_code}
+DeviceStatus::DeviceStatus(int error_code) : error_code_ {error_code}
 {
     switch (error_code)
     {
