@@ -9,7 +9,11 @@ namespace thorlabs {
 enum class DeviceStatusCode {
   kOk,
   kKinesisError,
-  kDeviceNotFound
+  kDeviceNotFound,
+  kPollingError,  
+  kLoadSettingsError,
+  kConnectionError,
+  kTimeout
 };
 
 class DeviceStatus {
@@ -19,6 +23,10 @@ class DeviceStatus {
         static DeviceStatus Ok();
         static DeviceStatus FromKinesis(short kinesis_error_code);
         static DeviceStatus DeviceNotFound(const std::string& serial_number);
+        static DeviceStatus FailedToLoadSettings(const std::string& serial_number);
+        static DeviceStatus FailedToStartPolling(const std::string& serial_number);
+        static DeviceStatus NotConnected(const std::string& serial_number);
+        static DeviceStatus Timeout(const std::string& serial_number, int expected_message);
 
         ~DeviceStatus() = default;
 

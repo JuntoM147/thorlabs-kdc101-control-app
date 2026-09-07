@@ -119,5 +119,32 @@ DeviceStatus DeviceStatus::DeviceNotFound(const std::string& serial_number)
                         "Device with serial number " + serial_number + " not found");
 }
 
+DeviceStatus DeviceStatus::FailedToLoadSettings(const std::string& serial_number);
+{
+    return DeviceStatus(DeviceStatusCode::kLoadSettingsError,
+                        std::nullopt,
+                        "Failed to load settings for device with serial number " + serial_number);
+}
+
+DeviceStatus DeviceStatus::FailedToStartPolling(const std::string& serial_number);
+{
+    return DeviceStatus(DeviceStatusCode::kPollingError,
+                        std::nullopt,
+                        "Failed to start polling device with serial number " + serial_number);
+}
+DeviceStatus DeviceStatus::NotConnected(const std::string& serial_number)
+{
+    return DeviceStatus(DeviceStatusCode::kConnectionError,
+                        std::nullopt,
+                        "Device with serial number " + serial_number + " not connected");
+}
+
+DeviceStatus DeviceStatus::Timeout(const std::string& serial_number, int expected_message)
+{
+    return DeviceStatus(DeviceStatusCode::kTimeout,
+                        std::nullopt,
+                        "Device with serial number " + serial_number + " timed out");
+}
+
 } // namespace thorlabs
 
