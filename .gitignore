@@ -69,3 +69,11 @@ dkms.conf
 *.csproj.user
 *.vbproj.user
 *.vcxproj.user
+
+# Build directories
+build/
+build-*/
+cmake-build-*/
+
+# Qt Creator local settings
+.qtcreator/
