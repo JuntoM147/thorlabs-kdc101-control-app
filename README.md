@@ -2,11 +2,17 @@
 TODO
 
 # Build
-TODO
+Requires: 
+- Qt 6.5 or newer (Core and Widgets), 
+- CMake 3.19 or newer
+- C++17 compiler
+
+Alternatively, from a shell with your compiler and CMake configured:
+
 
 # UI 
 
-Qt was used to design the UI for this project 
+TODO
 
 See: https://www.qt.io/
 
