@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <chrono>
+#include <cmath>
 #include <expected>
 #include <thread>
 #include <array>
@@ -208,6 +209,65 @@ constexpr WORD kMessageIdMoved = 1;
 constexpr WORD kMessageIdStopped = 2;
 constexpr auto kMessageCheckInterval = std::chrono::milliseconds(10);
 
+std::expected<int, DeviceStatus> ConvertMotionParameter(const std::string& serial_number, double value, int unit_type) {
+    if (!std::isfinite(value) || value <= 0.0) {
+        return std::unexpected(DeviceStatus::FromKinesis(FT_InvalidParameter));
+    }
+    int device_units = 0;
+    auto status = DeviceStatus::FromKinesis(CC_GetDeviceUnitFromRealValue(serial_number.c_str(), value, &device_units, unit_type));
+
+    if (!status.ok()) {
+        return std::unexpected(status);
+    }
+
+    if (device_units <= 0) {
+        return std::unexpected(DeviceStatus::FromKinesis(FT_InvalidParameter));
+    }
+
+    return device_units;
+    }
+
+
+DeviceStatus ApplyMotionParameters(const std::string& serial_number, double speed, double acceleration, bool jog) {
+    if (!std::isfinite(speed) || !std::isfinite(acceleration) || speed < 0.0 || acceleration < 0.0) {
+        return DeviceStatus::FromKinesis(FT_InvalidParameter);
+    }
+
+    if (speed == 0.0 && acceleration == 0.0) {
+        return DeviceStatus::Ok();
+    }
+
+    int device_speed = 0;
+    int device_acceleration = 0;
+    const char* serial = serial_number.c_str();
+    auto status = DeviceStatus::FromKinesis(jog
+        ? CC_GetJogVelParams(serial, &device_acceleration, &device_speed)
+        : CC_GetVelParams(serial, &device_acceleration, &device_speed));
+        
+    if (!status.ok()) {
+        return status;
+    }
+    
+    if (speed > 0.0) {
+        auto converted = ConvertMotionParameter(serial_number, speed, kUnitTypeSpeed);
+        if (!converted) {
+        return converted.error();
+        }
+        device_speed = *converted;
+    }
+    if (acceleration > 0.0) {
+        auto converted = ConvertMotionParameter(
+            serial_number, acceleration, kUnitTypeAcceleration);
+        if (!converted) {
+        return converted.error();
+        }
+        device_acceleration = *converted;
+    }
+    return DeviceStatus::FromKinesis(jog
+        ? CC_SetJogVelParams(serial, device_acceleration, device_speed)
+        : CC_SetVelParams(serial, device_acceleration, device_speed));
+    }
+
 }
 
 KDC101::PositionResult KDC101::GetPosition()
@@ -227,6 +287,21 @@ KDC101::PositionResult KDC101::GetPosition()
 
 DeviceStatus KDC101::Home(double speed)
 { 
+    if (!std::isfinite(speed) || speed < 0.0) {
+        return DeviceStatus::FromKinesis(FT_InvalidParameter);
+    }
+
+    if (speed > 0.0) {
+        auto converted = ConvertMotionParameter(serial_number_, speed, kUnitTypeSpeed);
+        if (!converted) {
+            return converted.error();
+        }
+        auto status = DeviceStatus::FromKinesis(CC_SetHomingVelocity(serial_number_.c_str(), static_cast<unsigned int>(*converted)));
+        if (!status.ok()) {
+            return status;
+        }
+    }
+
     CC_ClearMessageQueue(serial_number_.c_str());
     
     DeviceStatus home_status = DeviceStatus::FromKinesis(CC_Home(serial_number_.c_str()));
@@ -241,6 +316,11 @@ DeviceStatus KDC101::Home(double speed)
 
 DeviceStatus KDC101::Jog(Direction dir, double step_size, double speed, double acceleration)
 {
+    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, true);
+    if (!velocity_status.ok()) {
+        return velocity_status;
+    }
+
     CC_ClearMessageQueue(serial_number_.c_str());
 
     int device_unit;
@@ -282,6 +362,11 @@ DeviceStatus KDC101::Jog(Direction dir, double step_size, double speed, double a
 
 DeviceStatus KDC101::StartDrive(Direction dir, double speed, double acceleration)
 {
+    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, false);
+    if (!velocity_status.ok()) {
+        return velocity_status;
+    }
+    
     MOT_TravelDirection mot_direction;
 
     if (dir == Direction::kForward) {
@@ -306,6 +391,11 @@ DeviceStatus KDC101::Stop(StopMode stop_mode)
 
 DeviceStatus KDC101::MoveAbsolute(double position, double speed, double acceleration)
 {
+    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, false);
+    if (!velocity_status.ok()) {
+        return velocity_status;
+    }
+
     CC_ClearMessageQueue(serial_number_.c_str());
 
     // convert to device units

@@ -11,7 +11,7 @@
 namespace thorlabs {
 
 enum class Direction {
-    kForward = 0,
+    kForward,
     kBackward
 };
 
