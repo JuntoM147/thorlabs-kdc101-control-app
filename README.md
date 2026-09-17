@@ -1,20 +1,18 @@
 # About
 TODO
 
-# Build
-Requires: 
-- Qt 6.5 or newer (Core and Widgets), 
-- CMake 3.19 or newer
-- C++17 compiler
+# Dependencies
 
-Alternatively, from a shell with your compiler and CMake configured:
+The dependencies to compile and run this application are listed in the table below:
 
+| Dependency | Purpose | Download |
+| --- | --- | --- |
+| Qt 6.5+ (Core and Widgets, MSVC kit) | UI | [Qt](https://www.qt.io) |
+| CMake 3.19+ | Build configuration | [CMake](https://cmake.org/download/) |
+| MSVC with C++23 | Compiler | [Visual Studio / Build Tools](https://visualstudio.microsoft.com/downloads/) |
+| Thorlabs Kinesis SDK | KDC101 motor control | [Kinesis](https://www.thorlabs.com/software-pages/motion_control/) |
+| NI-DAQmx library | Laser control | [NI-DAQmx](https://www.ni.com/en/support/downloads/drivers/download.ni-daq-mx.html) |
 
-# UI 
-
-TODO
-
-See: https://www.qt.io/
 
 # Coding Style
 
