@@ -59,7 +59,7 @@ class KDC101 {
         bool polling_;
         bool channel_enabled_;
 
-        [[nodiscard]] DeviceStatus WaitForMotorMessage(int expected_message, std::chrono::milliseconds timeout_ms = 2000);
+        [[nodiscard]] DeviceStatus WaitForMotorMessage(int expected_message, std::chrono::milliseconds timeout_ms = std::chrono::milliseconds{2000});
 };
 
 } // namespace thorlabs 

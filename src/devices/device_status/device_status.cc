@@ -119,14 +119,14 @@ DeviceStatus DeviceStatus::DeviceNotFound(const std::string& serial_number)
                         "Device with serial number " + serial_number + " not found");
 }
 
-DeviceStatus DeviceStatus::FailedToLoadSettings(const std::string& serial_number);
+DeviceStatus DeviceStatus::FailedToLoadSettings(const std::string& serial_number)
 {
     return DeviceStatus(DeviceStatusCode::kLoadSettingsError,
                         std::nullopt,
                         "Failed to load settings for device with serial number " + serial_number);
 }
 
-DeviceStatus DeviceStatus::FailedToStartPolling(const std::string& serial_number);
+DeviceStatus DeviceStatus::FailedToStartPolling(const std::string& serial_number)
 {
     return DeviceStatus(DeviceStatusCode::kPollingError,
                         std::nullopt,

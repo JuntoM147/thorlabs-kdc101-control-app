@@ -202,6 +202,12 @@ constexpr int kUnitTypeDistance = 0;
 constexpr int kUnitTypeSpeed = 1;
 constexpr int kUnitTypeAcceleration = 2;
 
+constexpr WORD kMessageTypeGenericMotor = 0;
+constexpr WORD kMessageIdHomed = 0;
+constexpr WORD kMessageIdMoved = 1;
+constexpr WORD kMessageIdStopped = 2;
+constexpr auto kMessageCheckInterval = std::chrono::milliseconds(10);
+
 }
 
 KDC101::PositionResult KDC101::GetPosition()
@@ -209,7 +215,7 @@ KDC101::PositionResult KDC101::GetPosition()
     int device_unit = CC_GetPosition(serial_number_.c_str());
 
     double position_real;
-    DeviceStatus conversion_status = DeviceStatus::FromKinesis(CC_GetRealValueFromDeviceUnit(serial_number_.c_str(), device_unit, &position_real, kUnitTypeDistance); 
+    DeviceStatus conversion_status = DeviceStatus::FromKinesis(CC_GetRealValueFromDeviceUnit(serial_number_.c_str(), device_unit, &position_real, kUnitTypeDistance));
 
     if (!conversion_status.ok()) {
         return std::unexpected(conversion_status);
@@ -219,7 +225,7 @@ KDC101::PositionResult KDC101::GetPosition()
 }
 
 
-DeviceStatus KDC101::Home(double speed, double acceleration)
+DeviceStatus KDC101::Home(double speed)
 { 
     CC_ClearMessageQueue(serial_number_.c_str());
     
@@ -238,8 +244,8 @@ DeviceStatus KDC101::Jog(Direction dir, double step_size, double speed, double a
     CC_ClearMessageQueue(serial_number_.c_str());
 
     int device_unit;
-    DeviceStatus conversion_status = DeviceStatus::FromKinesis(CC_GetDeviceUnitFromRealValue(serial_number_.c_str()
-                                                                                             position, 
+    DeviceStatus conversion_status = DeviceStatus::FromKinesis(CC_GetDeviceUnitFromRealValue(serial_number_.c_str(),
+                                                                                             step_size,
                                                                                              &device_unit, 
                                                                                              kUnitTypeDistance));
 
@@ -252,8 +258,8 @@ DeviceStatus KDC101::Jog(Direction dir, double step_size, double speed, double a
         return jog_mode_status;
     }
 
-    DeviceStatus set_step_size_status = DeviceStatus::FromKinesis(CC_SetJogStepSize(serialNo, static_cast<unsigned int>(device_unit)));
-    if (!step_size_status.ok()) {
+    DeviceStatus set_step_size_status = DeviceStatus::FromKinesis(CC_SetJogStepSize(serial_number_.c_str(), static_cast<unsigned int>(device_unit)));
+    if (!set_step_size_status.ok()) {
         return set_step_size_status;
     }
 
@@ -322,17 +328,6 @@ DeviceStatus KDC101::MoveAbsolute(double position, double speed, double accelera
 }
 
 
-namespace {
-
-constexpr WORD kMessageTypeGenericMotor = 0;
-constexpr WORD kMessageIdHomed = 0;
-constexpr WORD kMessageIdMoved = 1;
-constexpr WORD kMessageIdStopped = 2;
-constexpr auto kMessageCheckInterval = std::chrono::milliseconds(10);
-
-} // namespace
-
-
 DeviceStatus KDC101::WaitForMotorMessage(int expected_message, std::chrono::milliseconds timeout_ms)
 {
     const WORD expected_message_id = static_cast<WORD>(expected_message);
@@ -352,7 +347,7 @@ DeviceStatus KDC101::WaitForMotorMessage(int expected_message, std::chrono::mill
 
         if (!CC_CheckConnection(serial_number_.c_str())) {
             connected_ = false;
-            return DeviceStatus::NotConnected();
+            return DeviceStatus::NotConnected(serial_number_);
         }
 
         std::this_thread::sleep_for(kMessageCheckInterval);
