@@ -4,7 +4,8 @@
 #include <string>
 #include <expected> // Requires C++23
 #include <memory>
-#include <chrono>
+#include <cstdint>
+#include <optional>
 
 #include "device_status/device_status.h"
 
@@ -25,10 +26,18 @@ constexpr double kDefaultAcceleration = 0.0;
 constexpr double kDefaultStepSize = 0.0;
 constexpr int kDefaultPollingIntervalMs = 200;
 
+// Match the SDK's unsigned WORD (16-bit) and DWORD (32-bit) ranges
+struct DeviceMessage {
+    std::uint16_t type;
+    std::uint16_t id;
+    std::uint32_t data;
+};
+
 class KDC101 {
     public:
         using CreateResult = std::expected<std::unique_ptr<KDC101>, DeviceStatus>;
         using PositionResult = std::expected<double, DeviceStatus>;
+        using MessageResult = std::expected<std::optional<DeviceMessage>, DeviceStatus>;
 
         KDC101() = delete;
         ~KDC101();
@@ -44,11 +53,17 @@ class KDC101 {
         [[nodiscard]] static CreateResult Create(std::string serial_number, int polling_interval_ms = kDefaultPollingIntervalMs, bool simulation = false);
 
         [[nodiscard]] PositionResult GetPosition();
-        [[nodiscard]] DeviceStatus Home(double speed = kDefaultSpeed);
-        [[nodiscard]] DeviceStatus Jog(Direction dir, double step_size = kDefaultStepSize, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+
+        [[nodiscard]] DeviceStatus StartHome(double speed = kDefaultSpeed);
+        [[nodiscard]] DeviceStatus StartJog(Direction dir, double step_size = kDefaultStepSize, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
         [[nodiscard]] DeviceStatus StartDrive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
         [[nodiscard]] DeviceStatus Stop(StopMode stop_mode = StopMode::kProfiled);
-        [[nodiscard]] DeviceStatus MoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceStatus StartMoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+
+        [[nodiscard]] MessageResult GetNextMessage();
+        [[nodiscard]] DeviceStatus CheckConnection() const;
+
+        [[nodiscard]] DeviceStatus ClearMessageQueue();
 
     private:
         KDC101(std::string serial_number, bool simulation);
@@ -59,7 +74,6 @@ class KDC101 {
         bool polling_;
         bool channel_enabled_;
 
-        [[nodiscard]] DeviceStatus WaitForMotorMessage(int expected_message, std::chrono::milliseconds timeout_ms = std::chrono::milliseconds{2000});
 };
 
 } // namespace thorlabs 
