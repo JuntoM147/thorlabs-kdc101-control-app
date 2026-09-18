@@ -16,12 +16,14 @@ qt_add_executable(frontend
     main_window/main_window.h
     motor_control/motor_control.cc
     motor_control/motor_control.h
+    motor_information/motor_information.cc
+    motor_information/motor_information.h
     scan/scan.cc
     scan/scan.h
+    scan_control/scan_control.cc
+    scan_control/scan_control.h
     laser_control/laser_control.cc
     laser_control/laser_control.h
-    emergency_stop/emergency_stop.cc
-    emergency_stop/emergency_stop.h
 )
 
 target_compile_features(frontend PRIVATE cxx_std_17)
