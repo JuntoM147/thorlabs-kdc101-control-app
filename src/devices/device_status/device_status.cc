@@ -119,6 +119,25 @@ DeviceStatus DeviceStatus::DeviceNotFound(const std::string& serial_number)
                         "Device with serial number " + serial_number + " not found");
 }
 
+DeviceStatus DeviceStatus::FromNiDaq(std::int32_t code, const std::string& message)
+{
+    // NI-DAQmx positive return codes are warnings, not failures.
+    if (code >= 0) {
+        return Ok();
+    }
+    DeviceStatus status(DeviceStatusCode::kNiDaqError, std::nullopt,
+                        message.empty() ? "NI-DAQmx error code: " + std::to_string(code) : message);
+    status.ni_daq_error_code_ = code;
+    return status;
+}
+
+DeviceStatus DeviceStatus::InvalidLaserLineCount(const std::string& line, std::uint32_t count)
+{
+    return DeviceStatus(DeviceStatusCode::kLaserLineConfigurationError, std::nullopt,
+                        "Laser requires exactly one digital output line; " + line +
+                        " selects " + std::to_string(count) + " lines.");
+}
+
 DeviceStatus DeviceStatus::FailedToLoadSettings(const std::string& serial_number)
 {
     return DeviceStatus(DeviceStatusCode::kLoadSettingsError,

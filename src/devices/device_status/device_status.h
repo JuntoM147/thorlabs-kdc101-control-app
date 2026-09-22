@@ -3,6 +3,7 @@
 
 #include <string>
 #include <optional>
+#include <cstdint>
 
 namespace thorlabs {
 
@@ -13,7 +14,9 @@ enum class DeviceStatusCode {
   kPollingError,  
   kLoadSettingsError,
   kConnectionError,
-  kTimeout
+  kTimeout,
+  kNiDaqError,
+  kLaserLineConfigurationError
 };
 
 class DeviceStatus {
@@ -22,6 +25,8 @@ class DeviceStatus {
 
         static DeviceStatus Ok();
         static DeviceStatus FromKinesis(short kinesis_error_code);
+        static DeviceStatus FromNiDaq(std::int32_t code, const std::string& message);
+        static DeviceStatus InvalidLaserLineCount(const std::string& line, std::uint32_t count);
         static DeviceStatus DeviceNotFound(const std::string& serial_number);
         static DeviceStatus FailedToLoadSettings(const std::string& serial_number);
         static DeviceStatus FailedToStartPolling(const std::string& serial_number);
@@ -32,6 +37,7 @@ class DeviceStatus {
 
         [[nodiscard]] DeviceStatusCode error_code() const {return error_code_;}
         [[nodiscard]] std::optional<short> kinesis_error_code() const {return kinesis_error_code_;}
+        [[nodiscard]] std::optional<std::int32_t> ni_daq_error_code() const {return ni_daq_error_code_;}
         [[nodiscard]] const std::string& error_message() const {return error_message_;}
 
         [[nodiscard]] bool ok() const {return error_code_ == DeviceStatusCode::kOk;}
@@ -41,6 +47,7 @@ class DeviceStatus {
 
         DeviceStatusCode error_code_;
         std::optional<short> kinesis_error_code_;
+        std::optional<std::int32_t> ni_daq_error_code_;
         std::string error_message_;
 };
 
