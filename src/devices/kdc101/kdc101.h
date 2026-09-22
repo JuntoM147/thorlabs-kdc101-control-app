@@ -76,6 +76,7 @@ class KDC101 {
         [[nodiscard]] DeviceStatus StartDrive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
         [[nodiscard]] DeviceStatus Stop(StopMode stop_mode = StopMode::kProfiled);
         [[nodiscard]] DeviceStatus StartMoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceStatus StartMoveRelative(double distance, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
 
         [[nodiscard]] EventResult GetNextEvent();
         [[nodiscard]] DeviceStatus CheckConnection() const;

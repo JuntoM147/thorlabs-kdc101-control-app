@@ -383,6 +383,27 @@ DeviceStatus KDC101::StartMoveAbsolute(double position, double speed, double acc
 }
 
 
+DeviceStatus KDC101::StartMoveRelative(double distance, double speed, double acceleration)
+{
+    if (!std::isfinite(distance)) {
+        return DeviceStatus::FromKinesis(FT_InvalidParameter);
+    }
+
+    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, false);
+    if (!velocity_status.ok()) {
+        return velocity_status;
+    }
+
+    int device_units = 0;
+    auto conversion_status = DeviceStatus::FromKinesis(CC_GetDeviceUnitFromRealValue(serial_number_.c_str(), distance, &device_units, kUnitTypeDistance));
+    if (!conversion_status.ok()) {
+        return conversion_status;
+    }
+
+    return DeviceStatus::FromKinesis(CC_MoveRelative(serial_number_.c_str(), device_units));
+}
+
+
 std::expected<MotorStatus, DeviceStatus> KDC101::GetStatus()
 {
     auto status = CheckConnection();
