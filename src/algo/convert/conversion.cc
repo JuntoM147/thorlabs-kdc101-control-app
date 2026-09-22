@@ -28,6 +28,11 @@ std::uint8_t BinaryMatrix::At(int x, int y) const {
 }
 
 void BinaryMatrix::Set(int x, int y, bool expose) {
+  if (pixels_.at(y).at(x) == 0 && expose) {
+    ++pixel_count_;
+  } else if (pixels_.at(y).at(x) == 1 && !expose) {
+    --pixel_count_;
+  }
   pixels_.at(y).at(x) = static_cast<std::uint8_t>(expose);
 }
 
