@@ -122,7 +122,7 @@ KDC101::KDC101(std::string serial_number, std::shared_ptr<const KinesisSimulatio
       channel_enabled_{false} {}
 
 
-KDC101::CreateResult KDC101::Create(std::string serial_number, int polling_interval_ms, std::shared_ptr<const KinesisSimulation> simulation)
+KDC101::CreateResult KDC101::CreateMotor(std::string serial_number, int polling_interval_ms, std::shared_ptr<const KinesisSimulation> simulation)
 {
     auto device = std::unique_ptr<KDC101>(new KDC101(serial_number, std::move(simulation)));
 

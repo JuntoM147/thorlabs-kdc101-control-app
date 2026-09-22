@@ -65,7 +65,7 @@ class KDC101 {
         KDC101(const KDC101&&) = delete;
         KDC101& operator=(const KDC101&&) = delete;
         
-        [[nodiscard]] static CreateResult Create(std::string serial_number, int polling_interval_ms = kDefaultPollingIntervalMs, std::shared_ptr<const KinesisSimulation> simulation = nullptr);
+        [[nodiscard]] static CreateResult CreateMotor(std::string serial_number, int polling_interval_ms = kDefaultPollingIntervalMs, std::shared_ptr<const KinesisSimulation> simulation = nullptr);
 
         [[nodiscard]] PositionResult GetPosition();
         [[nodiscard]] std::expected<MotorStatus, DeviceStatus> GetStatus();
