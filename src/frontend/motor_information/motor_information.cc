@@ -1,4 +1,5 @@
 #include "motor_information.h"
+#include "main_window/display_text.h"
 
 #include <initializer_list>
 
@@ -11,7 +12,7 @@
 
 namespace ui {
 
-QWidget* CreateMotorInformationSection(QWidget* parent) {
+QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("Motor information"), parent);
   section->setObjectName(QStringLiteral("motor_information"));
 
@@ -35,7 +36,8 @@ QWidget* CreateMotorInformationSection(QWidget* parent) {
         "QLabel[connected=\"false\"] { background: #ed1735; border-radius: 6px; }"
         "QLabel[connected=\"true\"] { background: #00a34a; border-radius: 6px; }");
     layout->addWidget(indicator, row, 1, Qt::AlignCenter);
-    layout->addWidget(new QLabel(QObject::tr("Disconnected"), section), row, 2);
+    auto* connection_status = new QLabel(QObject::tr("Disconnected"), section);
+    layout->addWidget(connection_status, row, 2);
 
     auto* serial_number = new QLineEdit(QString::number(27000001 + row), section);
     serial_number->setPlaceholderText(QObject::tr("Serial number"));
@@ -50,10 +52,10 @@ QWidget* CreateMotorInformationSection(QWidget* parent) {
     connect_button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     connect_button->setAccessibleName(QObject::tr("Connect %1 axis").arg(axis));
     connect_button->setEnabled(true);
-    connect_button->setToolTip(QObject::tr("Motor backend is not implemented yet."));
+    connect_button->setProperty("connected", false);
     layout->addWidget(connect_button, row, 5);
 
-    auto* homing_status = new QLineEdit(QObject::tr("Unhomed"), section);
+    auto* homing_status = new QLineEdit(QObject::tr("Unknown"), section);
     homing_status->setReadOnly(true);
     homing_status->setAccessibleName(QObject::tr("%1 axis homing status").arg(axis));
     homing_status->setToolTip(QObject::tr("Default status; homing has not been confirmed by hardware."));
@@ -61,9 +63,39 @@ QWidget* CreateMotorInformationSection(QWidget* parent) {
     homing_status->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     layout->addWidget(homing_status, row, 3);
 
+    const auto axis_id = static_cast<application::Axis>(row);
+    QObject::connect(connect_button, &QPushButton::clicked, section, [&view, axis_id, connect_button, serial_number] {
+      if (connect_button->property("connected").toBool()) {
+        emit view.DisconnectMotorRequested(axis_id);
+      } else {
+        const auto serial = serial_number->text().trimmed();
+        if (serial.isEmpty()) {
+          view.ShowError({axis_id, "Connect", "Enter a motor serial number."});
+          return;
+        }
+        emit view.ConnectMotorRequested({axis_id, serial.toStdString()});
+      }
+    });
+    QObject::connect(&view, &MainWindow::AxisStateUpdated, section, [=](application::AxisState state) {
+      if (state.axis != axis_id) return;
+      const bool connected = state.connection == application::ConnectionState::kConnected;
+      connect_button->setProperty("connected", connected);
+      connect_button->setText(connected ? QObject::tr("Disconnect") : QObject::tr("Connect"));
+      connect_button->setEnabled(state.connection != application::ConnectionState::kConnecting);
+      serial_number->setEnabled(!connected && state.connection != application::ConnectionState::kConnecting);
+      connection_status->setText(ConnectionText(state.connection));
+      homing_status->setText(!state.homed ? QObject::tr("Unknown")
+                           : *state.homed ? QObject::tr("Homed") : QObject::tr("Unhomed"));
+      homing_status->setToolTip(QString());
+      indicator->setAccessibleName(QObject::tr("%1 axis %2").arg(axis, ConnectionText(state.connection)));
+      indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 6px;"
+                                        : "background: #ed1735; border-radius: 6px;");
+    });
     ++row;
   }
 
+  section->setEnabled(false);
+  QObject::connect(&view, &MainWindow::ManualControlsEnabled, section, &QWidget::setEnabled);
   return section;
 }
 

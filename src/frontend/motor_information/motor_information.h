@@ -1,11 +1,12 @@
 #ifndef FRONTEND_MOTOR_INFORMATION_H
 #define FRONTEND_MOTOR_INFORMATION_H
 
-class QWidget;
+#include <QWidget>
+#include "main_window/main_window.h"
 
 namespace ui {
 
-QWidget* CreateMotorInformationSection(QWidget* parent);
+QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent);
 
 }  // namespace ui
 

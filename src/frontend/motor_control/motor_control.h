@@ -1,11 +1,12 @@
 #ifndef FRONTEND_MOTOR_CONTROL_H
 #define FRONTEND_MOTOR_CONTROL_H
 
-class QWidget;
+#include <QWidget>
+#include "main_window/main_window.h"
 
 namespace ui {
 
-QWidget* CreateMotorControlSection(QWidget* parent);
+QWidget* CreateMotorControlSection(MainWindow& view, QWidget* parent);
 
 }  // namespace ui
 

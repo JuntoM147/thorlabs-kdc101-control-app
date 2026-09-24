@@ -45,7 +45,7 @@ class ImagePreview : public QLabel {
   }
 };
 
-void ImportImage(QWidget* parent, QLabel* preview, QLabel* status) {
+void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview, QLabel* status) {
   const QString path = QFileDialog::getOpenFileName(
       parent, QObject::tr("Import image"), QString(),
       QObject::tr("Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;"
@@ -58,6 +58,8 @@ void ImportImage(QWidget* parent, QLabel* preview, QLabel* status) {
   reader.setAutoTransform(true);
   const QImage image = reader.read();
   if (image.isNull()) {
+    view.SetScanImage({});
+    preview->clear();
     preview->setText(QObject::tr("No image imported"));
     preview->setToolTip(QString());
     status->setText(QObject::tr("Could not load %1: %2")
@@ -65,6 +67,7 @@ void ImportImage(QWidget* parent, QLabel* preview, QLabel* status) {
     return;
   }
 
+  view.SetScanImage(image);
   QPixmap pixmap = QPixmap::fromImage(image);
   pixmap.setDevicePixelRatio(1.0);
   preview->setPixmap(pixmap);
@@ -77,7 +80,7 @@ void ImportImage(QWidget* parent, QLabel* preview, QLabel* status) {
 
 }  // namespace
 
-QWidget* CreateImageSection(QWidget* parent) {
+QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr(" Image"), parent);
 
   auto* layout = new QVBoxLayout(section);
@@ -110,27 +113,30 @@ QWidget* CreateImageSection(QWidget* parent) {
   layout->addWidget(status);
 
   QObject::connect(import_button, &QPushButton::clicked, section,
-                   [section, preview, status]() {
-    ImportImage(section, preview, status);
+                   [&view, section, preview, status]() {
+    ImportImage(view, section, preview, status);
   });
 
-  QObject::connect(clear_button, &QPushButton::clicked, section, [preview, status]() {
+  QObject::connect(clear_button, &QPushButton::clicked, section, [&view, preview, status]() {
+    view.SetScanImage({});
     preview->clear();
     preview->setText(QObject::tr("No image imported"));
     preview->setToolTip(QString());
     status->setText(QObject::tr("No image imported."));
   });
 
+  QObject::connect(&view, &MainWindow::ScanInputsEnabled, import_button, &QWidget::setEnabled);
+  QObject::connect(&view, &MainWindow::ScanInputsEnabled, clear_button, &QWidget::setEnabled);
   return section;
 }
 
-QWidget* CreateScanSection(QWidget* parent) {
+QWidget* CreateScanSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("Scan"), parent);
 
   auto* layout = new QHBoxLayout(section);
   layout->setSpacing(12);
-  layout->addWidget(CreateImageSection(section), 3);
-  layout->addWidget(CreateLaserControlSection(section), 2);
+  layout->addWidget(CreateImageSection(view, section), 3);
+  layout->addWidget(CreateLaserControlSection(view, section), 2);
 
   return section;
 }

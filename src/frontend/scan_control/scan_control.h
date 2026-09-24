@@ -1,11 +1,12 @@
 #ifndef FRONTEND_SCAN_CONTROL_H
 #define FRONTEND_SCAN_CONTROL_H
 
-class QWidget;
+#include <QWidget>
+#include "main_window/main_window.h"
 
 namespace ui {
 
-QWidget* CreateScanControlSection(QWidget* parent);
+QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent);
 
 }  // namespace ui
 

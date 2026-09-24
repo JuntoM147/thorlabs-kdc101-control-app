@@ -1,11 +1,12 @@
 #ifndef FRONTEND_SCAN_H
 #define FRONTEND_SCAN_H
 
-class QWidget;
+#include <QWidget>
+#include "main_window/main_window.h"
 
 namespace ui {
 
-QWidget* CreateScanSection(QWidget* parent);
+QWidget* CreateScanSection(MainWindow& view, QWidget* parent);
 
 }  // namespace ui
 

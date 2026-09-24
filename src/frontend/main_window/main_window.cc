@@ -2,8 +2,10 @@
 
 #include <QHBoxLayout>
 #include <QStatusBar>
+#include <QStringList>
 #include <QWidget>
 #include <QVBoxLayout>
+#include <utility>
 
 #include "motor_information/motor_information.h"
 #include "motor_control/motor_control.h"
@@ -103,13 +105,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       font-weight: 600;
       padding: 12px;
     }
-    QPushButton#laserStatus:checked {
+    QPushButton#laserStatus[outputOn="true"] {
       background: #e9f8ef;
       color: #00843b;
       border-color: #8bd5ac;
     }
     QPushButton#laserStatus:hover { background: #ffe3e7; }
-    QPushButton#laserStatus:checked:hover { background: #d6f1e1; }
+    QPushButton#laserStatus[outputOn="true"]:hover { background: #d6f1e1; }
     QPushButton#laserStatus:focus { border: 2px solid #126bf0; padding: 11px; }
   )"));
 
@@ -123,20 +125,83 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   auto* left_layout = new QVBoxLayout(left_column);
   left_layout->setContentsMargins(0, 0, 0, 0);
   left_layout->setSpacing(12);
-  left_layout->addWidget(CreateMotorControlSection(left_column), 1);
-  left_layout->addWidget(CreateMotorInformationSection(left_column));
+  left_layout->addWidget(CreateMotorControlSection(*this, left_column), 1);
+  left_layout->addWidget(CreateMotorInformationSection(*this, left_column));
   layout->addWidget(left_column, 2);
 
   auto* right_column = new QWidget(central_widget);
   auto* right_layout = new QVBoxLayout(right_column);
   right_layout->setContentsMargins(0, 0, 0, 0);
   right_layout->setSpacing(12);
-  right_layout->addWidget(CreateScanSection(right_column), 1);
-  right_layout->addWidget(CreateScanControlSection(right_column));
+  right_layout->addWidget(CreateScanSection(*this, right_column), 1);
+  right_layout->addWidget(CreateScanControlSection(*this, right_column));
   layout->addWidget(right_column, 3);
 
   setCentralWidget(central_widget);
-  statusBar()->showMessage(tr("Hardware not connected."));
+  SetBackendAvailable(false);
 }
 
+void MainWindow::SetBackendAvailable(bool available) {
+  backend_available_ = available;
+  emit ManualControlsEnabled(available && !controls_locked_);
+  emit ScanInputsEnabled(!controls_locked_);
+  emit ScanAvailabilityChanged();
+  statusBar()->showMessage(available ? tr("Hardware not connected.")
+                                    : tr("Application backend is not available."));
+}
+
+void MainWindow::SetControlsLocked(bool locked) {
+  controls_locked_ = locked;
+  emit ManualControlsEnabled(backend_available_ && !locked);
+  emit ScanInputsEnabled(!locked);
+  emit ScanAvailabilityChanged();
+}
+
+void MainWindow::SetScanImage(const QImage& image) {
+  has_pattern_ = false;
+  scan_configuration_.pattern = {};
+  if (!image.isNull()) {
+    auto result = algo::Convert(image);
+    if (result && result->PixelCount() > 0) {
+      scan_configuration_.pattern = std::move(*result);
+      has_pattern_ = true;
+    } else {
+      ShowError({{}, "Import image", result ? "The image has no exposed pixels." : result.error()});
+    }
+  }
+  emit ScanAvailabilityChanged();
+}
+
+void MainWindow::SetPixelSize(double micrometres) {
+  scan_configuration_.pixel_size_mm = micrometres / 1000.0;
+}
+
+void MainWindow::SetExposureTime(int milliseconds) {
+  scan_configuration_.exposure_time = std::chrono::milliseconds(milliseconds);
+}
+
+bool MainWindow::CanStartScan() const {
+  return backend_available_ && !controls_locked_ && has_pattern_ &&
+         scan_state_.phase == application::ScanPhase::kIdle;
+}
+
+void MainWindow::RequestScan() {
+  if (!CanStartScan()) return;
+  scan_configuration_.start_pixel = {0, 0};
+  emit StartScanRequested(scan_configuration_);
+}
+
+void MainWindow::UpdateScanState(application::ScanState state) {
+  scan_state_ = state;
+  emit ScanDisplayChanged(state);
+  emit ScanAvailabilityChanged();
+}
+
+void MainWindow::ShowError(application::OperationError error) {
+  const QString axis = error.axis
+      ? tr("Axis %1: ").arg(QStringList{"X", "Y", "Z"}.at(static_cast<int>(*error.axis)))
+      : QString();
+  statusBar()->showMessage(axis + QString::fromStdString(error.operation) +
+                          ": " + QString::fromStdString(error.message));
+}
 }  // namespace ui

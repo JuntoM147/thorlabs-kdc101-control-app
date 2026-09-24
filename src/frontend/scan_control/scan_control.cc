@@ -1,4 +1,5 @@
 #include "scan_control.h"
+#include <algorithm>
 
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -11,7 +12,7 @@
 
 namespace ui {
 
-QWidget* CreateScanControlSection(QWidget* parent) {
+QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("Scan control"), parent);
   section->setObjectName(QStringLiteral("scan_control"));
 
@@ -25,10 +26,10 @@ QWidget* CreateScanControlSection(QWidget* parent) {
   progress->setAccessibleName(QObject::tr("Scan progress"));
   layout->addWidget(progress);
 
-  auto* estimated_time = new QLabel(QObject::tr("Estimated time: —"), section);
-  estimated_time->setAccessibleName(QObject::tr("Estimated scan time"));
+  auto* estimated_time = new QLabel(QObject::tr("Idle"), section);
+  estimated_time->setAccessibleName(QObject::tr("Scan state"));
   estimated_time->setAlignment(Qt::AlignCenter);
-  estimated_time->setToolTip(QObject::tr("Available when a scan has been configured."));
+  estimated_time->setToolTip(QObject::tr("Reported scan phase."));
   layout->addWidget(estimated_time);
 
   auto* buttons = new QHBoxLayout();
@@ -38,7 +39,7 @@ QWidget* CreateScanControlSection(QWidget* parent) {
   start->setIcon(section->style()->standardIcon(QStyle::SP_MediaPlay));
   start->setProperty("primary", true);
   start->setAccessibleName(QObject::tr("Start scan"));
-  start->setToolTip(QObject::tr("Scan backend is not implemented yet."));
+  start->setToolTip(QObject::tr("Image origin (0, 0) maps to the current stage position."));
   start->setEnabled(false);
   start->setMinimumSize(88, 40);
   start->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -53,7 +54,51 @@ QWidget* CreateScanControlSection(QWidget* parent) {
   stop->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   buttons->addWidget(stop, 1);
 
+  auto* pause = new QPushButton(QObject::tr("Pause"), section);
+  pause->setAccessibleName(QObject::tr("Pause scan"));
+  pause->setEnabled(false);
+  auto* resume = new QPushButton(QObject::tr("Resume"), section);
+  resume->setAccessibleName(QObject::tr("Resume scan"));
+  resume->setEnabled(false);
+  buttons->insertWidget(1, pause, 1);
+  buttons->insertWidget(2, resume, 1);
   layout->addLayout(buttons);
+
+  QObject::connect(start, &QPushButton::clicked, &view, &MainWindow::RequestScan);
+  QObject::connect(pause, &QPushButton::clicked, &view, &MainWindow::PauseScanRequested);
+  QObject::connect(resume, &QPushButton::clicked, &view, &MainWindow::ResumeScanRequested);
+  QObject::connect(stop, &QPushButton::clicked, &view, &MainWindow::CancelScanRequested);
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
+    using application::ScanPhase;
+    const auto phase = view.ScanPhase();
+    start->setEnabled(view.CanStartScan());
+    pause->setEnabled(view.HasBackend() && phase == ScanPhase::kRunning);
+    resume->setEnabled(view.HasBackend() && phase == ScanPhase::kPaused);
+    stop->setEnabled(view.HasBackend() && phase != ScanPhase::kIdle &&
+                     phase != ScanPhase::kFailed && phase != ScanPhase::kStopping);
+    stop->setToolTip(QObject::tr("Cancel the scan and stop its device operations."));
+  });
+  QObject::connect(&view, &MainWindow::ScanDisplayChanged, section, [=](application::ScanState state) {
+    using application::ScanPhase;
+    const int percent = state.total_instructions == 0 ? 0
+        : static_cast<int>(100.0L * std::min(state.completed_instructions, state.total_instructions)
+                           / state.total_instructions);
+    progress->setValue(percent);
+    QString phase;
+    switch (state.phase) {
+      case ScanPhase::kIdle: phase = QObject::tr("Idle"); break;
+      case ScanPhase::kWaiting: phase = QObject::tr("Waiting for manual operations"); break;
+      case ScanPhase::kPreparing: phase = QObject::tr("Preparing"); break;
+      case ScanPhase::kRunning: phase = QObject::tr("Scanning"); break;
+      case ScanPhase::kPauseRequested: phase = QObject::tr("Pause requested"); break;
+      case ScanPhase::kPausing: phase = QObject::tr("Pausing"); break;
+      case ScanPhase::kPaused: phase = QObject::tr("Paused"); break;
+      case ScanPhase::kResuming: phase = QObject::tr("Resuming"); break;
+      case ScanPhase::kStopping: phase = QObject::tr("Stopping"); break;
+      case ScanPhase::kFailed: phase = QObject::tr("Failed"); break;
+    }
+    estimated_time->setText(phase);
+  });
 
   return section;
 }

@@ -1,4 +1,5 @@
 #include "motor_control.h"
+#include "main_window/display_text.h"
 
 #include <initializer_list>
 
@@ -29,7 +30,7 @@ QPushButton* CreateCommandButton(const QString& text, QWidget* parent) {
   return button;
 }
 
-QWidget* CreateAxisControl(const QString& axis, QWidget* parent) {
+QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QString& axis, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("%1 Axis").arg(axis), parent);
   section->setObjectName(QStringLiteral("axis%1").arg(axis));
 
@@ -112,6 +113,7 @@ QWidget* CreateAxisControl(const QString& axis, QWidget* parent) {
 
   auto* absolute_position = new QDoubleSpinBox(section);
   absolute_position->setDecimals(3);
+  absolute_position->setRange(-1000000.0, 1000000.0);
   absolute_position->setButtonSymbols(QAbstractSpinBox::NoButtons);
   absolute_position->setMinimumWidth(70);
   absolute_position->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
@@ -147,20 +149,68 @@ QWidget* CreateAxisControl(const QString& axis, QWidget* parent) {
   command_grid->addWidget(step_size, 2, 3);
   command_grid->addLayout(inputs, 2, 0);
 
+  auto jog = [&view, axis_id, step_size](application::Direction direction) {
+    bool ok = false;
+    const double step = QLocale::c().toDouble(step_size->currentText(), &ok);
+    if (!ok || !step_size->lineEdit()->hasAcceptableInput() || step <= 0) {
+      view.ShowError({axis_id, "Jog", "Enter a positive step size in mm."});
+      return;
+    }
+    emit view.JogAxisRequested(axis_id, direction, step, {});
+  };
+  QObject::connect(jog_up, &QPushButton::clicked, section, [jog] { jog(application::Direction::kForward); });
+  QObject::connect(jog_down, &QPushButton::clicked, section, [jog] { jog(application::Direction::kBackward); });
+  QObject::connect(drive_up, &QPushButton::clicked, section, [&view, axis_id] {
+    emit view.DriveAxisRequested(axis_id, application::Direction::kForward, {});
+  });
+  QObject::connect(drive_down, &QPushButton::clicked, section, [&view, axis_id] {
+    emit view.DriveAxisRequested(axis_id, application::Direction::kBackward, {});
+  });
+  QObject::connect(home, &QPushButton::clicked, section, [&view, axis_id] { emit view.HomeAxisRequested(axis_id); });
+  QObject::connect(stop, &QPushButton::clicked, section, [&view, axis_id] {
+    emit view.StopAxisRequested(axis_id, application::StopMode::kProfiled);
+  });
+  QObject::connect(go_button, &QPushButton::clicked, section, [&view, axis_id, absolute_position] {
+    emit view.MoveAxisRequested(axis_id, absolute_position->value(), {});
+  });
+  go_button->setAccessibleName(QObject::tr("Move %1 axis").arg(axis));
+  for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, stop, go_button}) {
+    button->setToolTip(QString());
+  }
+  QObject::connect(&view, &MainWindow::AxisStateUpdated, section, [=](application::AxisState state) {
+    if (state.axis != axis_id) return;
+    const bool connected = state.connection == application::ConnectionState::kConnected;
+    const bool idle = state.operation == application::OperationState::kIdle;
+    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button}) {
+      button->setEnabled(connected && idle);
+    }
+    stop->setEnabled(connected);
+    absolute_position->setEnabled(connected && idle);
+    step_size->setEnabled(connected && idle);
+    position->setText(state.position_mm ? QString::number(*state.position_mm, 'f', 3) : QObject::tr("Unknown"));
+    position->setToolTip(QString());
+    status->setText(ConnectionText(state.connection) + " / " + OperationText(state.operation));
+    indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 5px;"
+                                      : "background: #ed1735; border-radius: 5px;");
+  });
   return section;
 }
 }  // namespace
 
-QWidget* CreateMotorControlSection(QWidget* parent) {
+QWidget* CreateMotorControlSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("Motor control"), parent);
 
   auto* layout = new QVBoxLayout(section);
   layout->setSpacing(12);
+  int axis_index = 0;
   for (const auto& axis : {QStringLiteral("X"), QStringLiteral("Y"), QStringLiteral("Z")}) {
-    layout->addWidget(CreateAxisControl(axis, section));
+    layout->addWidget(CreateAxisControl(view, static_cast<application::Axis>(axis_index), axis, section));
+    ++axis_index;
   }
 
   layout->addStretch();
+  section->setEnabled(false);
+  QObject::connect(&view, &MainWindow::ManualControlsEnabled, section, &QWidget::setEnabled);
 
   return section;
 }
