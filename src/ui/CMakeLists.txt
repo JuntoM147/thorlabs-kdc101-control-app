@@ -21,6 +21,8 @@ add_library(frontend_ui STATIC
     scan_control/scan_control.h
     laser_control/laser_control.cc
     laser_control/laser_control.h
+    options/options.cc
+    options/options.h
 )
 
 target_compile_features(frontend_ui PUBLIC cxx_std_23)

@@ -1,6 +1,7 @@
 #include "main_window/main_window.h"
 
 #include <QHBoxLayout>
+#include <QTabWidget>
 #include <QStringList>
 #include <QWidget>
 #include <QVBoxLayout>
@@ -12,6 +13,7 @@
 #include "laser_control/laser_control.h"
 #include "status/status.h"
 #include "scan_control/scan_control.h"
+#include "options/options.h"
 
 namespace ui {
 
@@ -174,7 +176,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     laser_output_ = state.output_enabled;
     emit ScanAvailabilityChanged();
   });
-  setCentralWidget(central_widget);
+  auto* tabs = new QTabWidget(this);
+  tabs->addTab(central_widget, tr("Control"));
+  tabs->addTab(CreateOptionsSection(*this, tabs), tr("Options"));
+  setCentralWidget(tabs);
   SetBackendAvailable(false);
 }
 
