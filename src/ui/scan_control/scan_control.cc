@@ -123,7 +123,11 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
     using application::ScanPhase;
     const auto phase = view.ScanPhase();
-    start->setEnabled(view.CanStartScan());
+    const auto blockers = view.ScanStartBlockers();
+    start->setEnabled(blockers.isEmpty());
+    start->setToolTip(blockers.isEmpty()
+        ? QObject::tr("The applied start pixel maps to the current stage position.")
+        : blockers.join(QStringLiteral("\n")));
     pause->setEnabled(view.HasBackend() && phase == ScanPhase::kRunning);
     resume->setEnabled(view.HasBackend() && phase == ScanPhase::kPaused);
     stop->setEnabled(view.HasBackend() && phase != ScanPhase::kIdle &&

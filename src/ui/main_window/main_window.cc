@@ -160,6 +160,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   right_layout->addWidget(CreateScanControlSection(*this, right_column));
   layout->addWidget(right_column, 3);
 
+  connect(this, &MainWindow::AxisStateUpdated, this, [this](application::AxisState state) {
+    const auto index = static_cast<std::size_t>(state.axis);
+    if (index >= motor_connections_.size() || motor_connections_[index] == state.connection) return;
+    motor_connections_[index] = state.connection;
+    emit ScanAvailabilityChanged();
+  });
+  connect(this, &MainWindow::LaserStateUpdated, this, [this](application::LaserState state) {
+    if (laser_connection_ == state.connection) return;
+    laser_connection_ = state.connection;
+    emit ScanAvailabilityChanged();
+  });
   setCentralWidget(central_widget);
   SetBackendAvailable(false);
 }
@@ -167,6 +178,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 void MainWindow::SetBackendAvailable(bool available) {
   const bool lost_backend = backend_available_ && !available;
   backend_available_ = available;
+  if (!available) {
+    motor_connections_.fill(application::ConnectionState::kDisconnected);
+    laser_connection_ = application::ConnectionState::kDisconnected;
+  }
   emit ManualControlsEnabled(available && !controls_locked_);
   emit ScanInputsEnabled(!controls_locked_);
   emit ScanAvailabilityChanged();
@@ -210,11 +225,27 @@ void MainWindow::SetStartPixel(int x, int y) {
   emit ScanAvailabilityChanged();
 }
 
+QStringList MainWindow::ScanStartBlockers() const {
+  QStringList reasons;
+  if (!backend_available_) reasons << tr("Application backend is unavailable.");
+  if (controls_locked_ || scan_state_.phase != application::ScanPhase::kIdle)
+    reasons << tr("Wait until the scan is idle and controls are unlocked.");
+  const QStringList axes{"X", "Y", "Z"};
+  for (std::size_t i = 0; i < motor_connections_.size(); ++i) {
+    if (motor_connections_[i] != application::ConnectionState::kConnected)
+      reasons << tr("Connect the %1 motor.").arg(axes.at(i));
+  }
+  if (laser_connection_ != application::ConnectionState::kConnected)
+    reasons << tr("Connect the laser.");
+  if (!has_pattern_) reasons << tr("Import an image with exposed pixels.");
+  if (!start_pixel_set_ || scan_configuration_.start_pixel.x >= scan_image_size_.width() ||
+      scan_configuration_.start_pixel.y >= scan_image_size_.height())
+    reasons << tr("Apply a valid starting pixel using Set start.");
+  return reasons;
+}
+
 bool MainWindow::CanStartScan() const {
-  return backend_available_ && !controls_locked_ && has_pattern_ && start_pixel_set_ &&
-         scan_configuration_.start_pixel.x < scan_configuration_.pattern.Width() &&
-         scan_configuration_.start_pixel.y < scan_configuration_.pattern.Height() &&
-         scan_state_.phase == application::ScanPhase::kIdle;
+  return ScanStartBlockers().isEmpty();
 }
 
 void MainWindow::RequestScan() {

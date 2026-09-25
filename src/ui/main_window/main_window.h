@@ -1,6 +1,8 @@
 #ifndef FRONTEND_MAIN_WINDOW_H
 #define FRONTEND_MAIN_WINDOW_H
 
+#include <array>
+#include <QStringList>
 #include <QMainWindow>
 #include <QImage>
 
@@ -17,6 +19,7 @@ class MainWindow : public QMainWindow {
   void SetScanImage(const QImage& image);
   void SetStartPixel(int x, int y);
   bool CanStartScan() const;
+  QStringList ScanStartBlockers() const;
   bool CanSetStartPixel() const { return !controls_locked_ && !scan_image_size_.isEmpty(); }
   bool HasBackend() const { return backend_available_; }
   application::ScanPhase ScanPhase() const { return scan_state_.phase; }
@@ -56,6 +59,8 @@ class MainWindow : public QMainWindow {
   void ScanAvailabilityChanged();
 
  private:
+  std::array<application::ConnectionState, 3> motor_connections_{};
+  application::ConnectionState laser_connection_ = application::ConnectionState::kDisconnected;
   bool backend_available_ = false;
   bool controls_locked_ = false;
   bool has_pattern_ = false;

@@ -12,13 +12,19 @@ Application::Application(QObject* parent) : QObject(parent) {
   for (int i = 0; i < 3; ++i) {
     motors_[i] = std::make_unique<MotorController>(static_cast<Axis>(i));
     auto* motor = motors_[i].get();
-    connect(motor, &MotorController::StateChanged, this, &Application::AxisStateUpdated);
+    connect(motor, &MotorController::StateChanged, this, [this, i](AxisState state) {
+      motor_connections_[i] = state.connection;
+      emit AxisStateUpdated(state);
+    });
     connect(motor, &MotorController::RequestCompleted, this, &Application::OnWorkerCompleted);
     connect(motor, &MotorController::RequestFailed, this, &Application::OnWorkerFailed);
     connect(motor, &MotorController::RequestCancelled, this, &Application::OnWorkerCancelled);
   }
   laser_ = std::make_unique<LaserController>();
-  connect(laser_.get(), &LaserController::StateChanged, this, &Application::LaserStateUpdated);
+  connect(laser_.get(), &LaserController::StateChanged, this, [this](LaserState state) {
+    laser_connection_ = state.connection;
+    emit LaserStateUpdated(state);
+  });
   connect(laser_.get(), &LaserController::RequestCompleted, this, &Application::OnWorkerCompleted);
   connect(laser_.get(), &LaserController::RequestFailed, this, &Application::OnWorkerFailed);
   scan_ = std::make_unique<ScanController>(*motors_[0], *motors_[1], *motors_[2], *laser_);
@@ -84,9 +90,23 @@ void Application::DisconnectLaser() {
 void Application::SetLaserOutput(bool enabled) {
   if (int id = BeginManualRequest({})) laser_->SetOutputEnabled(id, enabled);
 }
+std::optional<OperationError> Application::ScanConnectionError() const {
+  for (std::size_t i = 0; i < motor_connections_.size(); ++i) {
+    if (motor_connections_[i] != ConnectionState::kConnected)
+      return OperationError{static_cast<Axis>(i), "Start scan", "Connect all three motors before starting a scan."};
+  }
+  if (laser_connection_ != ConnectionState::kConnected)
+    return OperationError{{}, "Start scan", "Connect the laser before starting a scan."};
+  return {};
+}
+
 void Application::StartScan(ScanConfiguration configuration) {
   if (state_ != ApplicationState::kManual) {
     emit RequestFailed({{}, "Start scan", "Application is already reserved or failed."}); return;
+  }
+  if (const auto error = ScanConnectionError()) {
+    emit RequestFailed(*error);
+    return;
   }
   for (const auto& [id, operation] : pending_operations_) {
     if (operation.continuous_drive) {
@@ -109,6 +129,12 @@ void Application::StartScan(ScanConfiguration configuration) {
 }
 void Application::TryStartScan() {
   if (state_ != ApplicationState::kScanRequested || !pending_operations_.empty()) return;
+  // A pending manual disconnect may have completed while the scan was waiting.
+  if (const auto error = ScanConnectionError()) {
+    scan_->Cancel();
+    emit RequestFailed(*error);
+    return;
+  }
   state_ = ApplicationState::kScanning;
   scan_->Start();
 }

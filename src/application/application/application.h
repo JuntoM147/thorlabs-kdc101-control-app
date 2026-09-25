@@ -77,8 +77,11 @@ class Application : public QObject {
   int next_request_id_ = 1;
   
   void TryStartScan();
+  std::optional<OperationError> ScanConnectionError() const;
   int BeginManualRequest(std::optional<Axis> axis, bool continuous_drive = false);
 
+  std::array<ConnectionState, 3> motor_connections_{};
+  ConnectionState laser_connection_ = ConnectionState::kDisconnected;
   std::array<std::unique_ptr<MotorController>, 3> motors_;
   std::unique_ptr<LaserController> laser_;
   std::unique_ptr<ScanController> scan_;
