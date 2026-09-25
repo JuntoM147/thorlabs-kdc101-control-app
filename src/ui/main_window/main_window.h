@@ -52,7 +52,9 @@ class MainWindow : public QMainWindow {
 
   // Broadcast application observations to the display sections.
   void StatusMessageChanged(const QString& message, bool error);
+  void AxisSettingsApplied(application::Axis axis, application::MotorSettings settings);
   void AxisStateUpdated(application::AxisState state);
+  void AxisRequestsPending(application::Axis axis, bool pending, bool stopping);
   void LaserStateUpdated(application::LaserState state);
   void ScanDisplayChanged(application::ScanState state);
   void ManualControlsEnabled(bool enabled);

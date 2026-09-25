@@ -18,7 +18,8 @@ class MotorController : public QObject {
   Q_OBJECT
 
  public:
-  explicit MotorController(Axis axis, QObject* parent = nullptr);
+  explicit MotorController(Axis axis, QObject* parent = nullptr,
+      std::shared_ptr<const thorlabs::KinesisSimulation> simulation = nullptr);
   ~MotorController() override;
 
  public slots:
@@ -72,6 +73,7 @@ class MotorController : public QObject {
   bool scan_cancelled_ = false;
 
   const Axis axis_;
+  std::shared_ptr<const thorlabs::KinesisSimulation> simulation_;
   int next_scan_request_id_ = -1;
   std::optional<int> scan_request_;
   std::optional<int> scan_stop_request_;  // Cancellation awaits both replies.

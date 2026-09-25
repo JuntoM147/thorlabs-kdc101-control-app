@@ -4,7 +4,9 @@
 #include <utility>
 
 namespace application {
-MotorController::MotorController(Axis axis, QObject* parent) : QObject(parent), axis_(axis) {}
+MotorController::MotorController(Axis axis, QObject* parent,
+    std::shared_ptr<const thorlabs::KinesisSimulation> simulation)
+    : QObject(parent), axis_(axis), simulation_(std::move(simulation)) {}
 MotorController::~MotorController() { StopWorkerAndWait(); }
 int MotorController::NextScanRequestId() {
   const int id = next_scan_request_id_;
@@ -13,7 +15,7 @@ int MotorController::NextScanRequestId() {
 }
 void MotorController::EnsureWorkerStarted() {
   if (worker_) return;
-  worker_ = new MotorWorker(axis_);
+  worker_ = new MotorWorker(axis_, nullptr, simulation_);
   worker_->moveToThread(&thread_);
   connect(&thread_, &QThread::finished, worker_, &QObject::deleteLater);
   connect(worker_, &MotorWorker::StateChanged, this, &MotorController::StateChanged);

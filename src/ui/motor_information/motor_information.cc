@@ -2,6 +2,7 @@
 #include "main_window/display_text.h"
 
 #include <initializer_list>
+#include <memory>
 
 #include <QGridLayout>
 #include <QGroupBox>
@@ -76,13 +77,32 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
         emit view.ConnectMotorRequested({axis_id, serial.toStdString()});
       }
     });
+    struct Availability {
+      application::AxisState state{};
+      bool pending = false;
+    };
+    const auto availability = std::make_shared<Availability>();
+    const auto refresh = [=] {
+      const auto& state = availability->state;
+      const bool connected = state.connection == application::ConnectionState::kConnected;
+      const bool ready = !availability->pending && state.connection != application::ConnectionState::kConnecting
+          && (!connected || state.operation == application::OperationState::kIdle);
+      connect_button->setEnabled(ready);
+      serial_number->setEnabled(ready && !connected);
+    };
+    QObject::connect(&view, &MainWindow::AxisRequestsPending, section,
+                     [=](application::Axis axis, bool pending, bool) {
+      if (axis != axis_id) return;
+      availability->pending = pending;
+      refresh();
+    });
     QObject::connect(&view, &MainWindow::AxisStateUpdated, section, [=](application::AxisState state) {
       if (state.axis != axis_id) return;
       const bool connected = state.connection == application::ConnectionState::kConnected;
       connect_button->setProperty("connected", connected);
       connect_button->setText(connected ? QObject::tr("Disconnect") : QObject::tr("Connect"));
-      connect_button->setEnabled(state.connection != application::ConnectionState::kConnecting);
-      serial_number->setEnabled(!connected && state.connection != application::ConnectionState::kConnecting);
+      availability->state = state;
+      refresh();
       connection_status->setText(ConnectionText(state.connection));
       homing_status->setText(!state.homed ? QObject::tr("Unknown")
                            : *state.homed ? QObject::tr("Homed") : QObject::tr("Unhomed"));

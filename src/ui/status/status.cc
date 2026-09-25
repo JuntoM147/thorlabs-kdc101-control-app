@@ -27,6 +27,19 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
     message->setStyleSheet(error ? "color: #b42338;" : "color: #00843b;");
   });
 
+  QObject::connect(&view, &MainWindow::AxisSettingsApplied, section,
+      [&view](application::Axis axis, application::MotorSettings settings) {
+    const auto index = static_cast<int>(axis);
+    if (index < 0 || index >= 3) return;
+    QStringList applied;
+    if (settings.jog_step_mm)
+      applied << QObject::tr("step size applied \u2014 %1 mm").arg(QString::number(*settings.jog_step_mm, 'g', 12));
+    if (settings.move.speed_mm_per_second)
+      applied << QObject::tr("speed applied \u2014 %1 mm/s").arg(QString::number(*settings.move.speed_mm_per_second, 'g', 12));
+    if (applied.isEmpty()) applied << QObject::tr("motion settings applied");
+    view.ShowMessage(QObject::tr("%1 axis: %2").arg(QStringList{"X", "Y", "Z"}.at(index), applied.join("; ")));
+  });
+
   // Only state transitions produce messages; position polling must not erase errors.
   QObject::connect(&view, &MainWindow::AxisStateUpdated, section,
       [&view, previous = std::array<application::AxisState, 3>{}]

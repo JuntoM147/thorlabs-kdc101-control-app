@@ -17,7 +17,9 @@ bool Valid(MotionSettings settings) {
 }
 }  // namespace
 
-MotorWorker::MotorWorker(Axis axis, QObject* parent) : QObject(parent), axis_(axis) {
+MotorWorker::MotorWorker(Axis axis, QObject* parent,
+    std::shared_ptr<const thorlabs::KinesisSimulation> simulation)
+    : QObject(parent), axis_(axis), simulation_(std::move(simulation)) {
   poll_timer_ = new QTimer(this);
   connect(poll_timer_, &QTimer::timeout, this, &MotorWorker::PollDevice);
 }
@@ -30,7 +32,7 @@ void MotorWorker::Connect(int id, MotorConnection connection) {
     return;
   }
   emit StateChanged({axis_, ConnectionState::kConnecting});
-  auto result = thorlabs::KDC101::CreateMotor(connection.serial_number, connection.polling_interval_ms);
+  auto result = thorlabs::KDC101::CreateMotor(connection.serial_number, connection.polling_interval_ms, simulation_);
   if (!result) {
     emit StateChanged({axis_, ConnectionState::kDisconnected});
     emit RequestFailed(id, {axis_, "Connect", result.error().error_message()});

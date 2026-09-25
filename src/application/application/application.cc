@@ -4,13 +4,19 @@
 #include <utility>
 
 namespace application {
+namespace {
+// Set to false to use physical Kinesis devices instead of the Kinesis simulator.
+constexpr bool kUseKinesisSimulation = true;
+}  // namespace
+
 Application::Application(QObject* parent) : QObject(parent) {
   qRegisterMetaType<AxisState>();
   qRegisterMetaType<LaserState>();
   qRegisterMetaType<ScanState>();
   qRegisterMetaType<OperationError>();
+  simulation_ = std::make_shared<thorlabs::KinesisSimulation>(kUseKinesisSimulation);
   for (int i = 0; i < 3; ++i) {
-    motors_[i] = std::make_unique<MotorController>(static_cast<Axis>(i));
+    motors_[i] = std::make_unique<MotorController>(static_cast<Axis>(i), nullptr, simulation_);
     auto* motor = motors_[i].get();
     connect(motor, &MotorController::StateChanged, this, [this, i](AxisState state) {
       motor_connections_[i] = state.connection;
@@ -47,17 +53,32 @@ int Application::NextRequestId() {
   if (id) next_request_id_ = id == INT_MAX ? 0 : id + 1;
   return id;
 }
-int Application::BeginManualRequest(std::optional<Axis> axis) {
+int Application::BeginManualRequest(std::optional<Axis> axis, bool stop) {
   if (axis && (*axis < Axis::kX || *axis > Axis::kZ)) {
     emit RequestFailed({{}, "Request", "Invalid axis."}); return 0;
   }
   if (state_ != ApplicationState::kManual) {
     emit RequestFailed({axis, "Request", "Manual controls are locked."}); return 0;
   }
+  if (axis) {
+    const auto i = static_cast<unsigned>(*axis);
+    const bool busy = stop
+        ? axis_stops_[i] || motor_operations_[i] == OperationState::kStopping
+        : HasPendingAxisRequest(*axis) || motor_operations_[i] != OperationState::kIdle;
+    if (busy) {
+      emit RequestFailed({axis, "Request", "Wait for the axis command to finish."});
+      return 0;
+    }
+  }
   const int id = NextRequestId();
   if (!id) { emit RequestFailed({axis, "Request", "Request IDs exhausted."}); return 0; }
   const bool was_empty = pending_operations_.empty();
   pending_operations_.insert(id);
+  if (axis) {
+    const auto i = static_cast<unsigned>(*axis);
+    (stop ? axis_stops_[i] : axis_requests_[i]) = id;
+    emit AxisRequestsPending(*axis, true, HasPendingAxisStop(*axis));
+  }
   if (was_empty) emit ManualRequestsPending(true);
   return id;
 }
@@ -68,7 +89,10 @@ void Application::DisconnectMotor(Axis axis) {
   if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Disconnect(id);
 }
 void Application::ConfigureAxis(Axis axis, MotorSettings settings) {
-  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->ConfigureMotion(id, settings);
+  if (int id = BeginManualRequest(axis)) {
+    pending_settings_.emplace(id, std::make_pair(axis, settings));
+    motors_[static_cast<int>(axis)]->ConfigureMotion(id, settings);
+  }
 }
 void Application::HomeAxis(Axis axis) {
   if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Home(id);
@@ -83,7 +107,7 @@ void Application::DriveAxis(Axis axis, Direction direction) {
   if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Drive(id, direction);
 }
 void Application::StopAxis(Axis axis, StopMode mode) {
-  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Stop(id, mode);
+  if (int id = BeginManualRequest(axis, true)) motors_[static_cast<int>(axis)]->Stop(id, mode);
 }
 void Application::ConnectLaser(LaserConnection connection) {
   if (int id = BeginManualRequest({})) laser_->Connect(id, connection);
@@ -138,11 +162,24 @@ void Application::PauseScan() { scan_->Pause(); }
 void Application::ResumeScan() { scan_->Resume(); }
 void Application::CancelScan() { scan_->Cancel(); }
 void Application::FinishManualRequest(int id) {
-  if (pending_operations_.erase(id) && pending_operations_.empty())
+  if (!pending_operations_.erase(id)) return;
+  pending_settings_.erase(id);
+  for (unsigned i = 0; i < axis_requests_.size(); ++i) {
+    if (axis_requests_[i] != id && axis_stops_[i] != id) continue;
+    if (axis_requests_[i] == id) axis_requests_[i] = 0;
+    if (axis_stops_[i] == id) axis_stops_[i] = 0;
+    const auto axis = static_cast<Axis>(i);
+    emit AxisRequestsPending(axis, HasPendingAxisRequest(axis), HasPendingAxisStop(axis));
+  }
+  if (pending_operations_.empty())
     emit ManualRequestsPending(false);
 }
 void Application::OnWorkerCompleted(int id) {
+  std::optional<std::pair<Axis, MotorSettings>> applied;
+  if (const auto request = pending_settings_.find(id); request != pending_settings_.end())
+    applied = request->second;
   FinishManualRequest(id);
+  if (applied) emit AxisSettingsApplied(applied->first, applied->second);
 }
 void Application::OnWorkerFailed(int id, OperationError error) {
   // ScanController handles unsolicited faults during its execution.

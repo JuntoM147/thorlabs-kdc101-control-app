@@ -2,6 +2,7 @@
 #include "main_window/display_text.h"
 
 #include <initializer_list>
+#include <memory>
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -251,17 +252,36 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   jog_up->setToolTip(QObject::tr("Jog one applied step in the positive direction."));
   drive_down->setToolTip(QObject::tr("Move continuously in the negative direction until stopped."));
   drive_up->setToolTip(QObject::tr("Move continuously in the positive direction until stopped."));
+  struct Availability {
+    application::AxisState state{};
+    bool pending = false;
+    bool stopping = false;
+  };
+  const auto availability = std::make_shared<Availability>();
+  const auto refresh = [=] {
+    const auto& state = availability->state;
+    const bool connected = state.connection == application::ConnectionState::kConnected;
+    const bool ready = connected && state.operation == application::OperationState::kIdle && !availability->pending;
+    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button, apply_step, apply_speed}) {
+      button->setEnabled(ready);
+    }
+    stop->setEnabled(connected && !availability->stopping && state.operation != application::OperationState::kStopping);
+    absolute_position->setEnabled(ready);
+    step_size->setEnabled(ready);
+    speed->setEnabled(ready);
+  };
+  QObject::connect(&view, &MainWindow::AxisRequestsPending, section,
+                   [=](application::Axis axis, bool pending, bool stopping) {
+    if (axis != axis_id) return;
+    availability->pending = pending;
+    availability->stopping = stopping;
+    refresh();
+  });
   QObject::connect(&view, &MainWindow::AxisStateUpdated, section, [=](application::AxisState state) {
     if (state.axis != axis_id) return;
+    availability->state = state;
+    refresh();
     const bool connected = state.connection == application::ConnectionState::kConnected;
-    const bool idle = state.operation == application::OperationState::kIdle;
-    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button, apply_step, apply_speed}) {
-      button->setEnabled(connected && idle);
-    }
-    stop->setEnabled(connected);
-    absolute_position->setEnabled(connected && idle);
-    step_size->setEnabled(connected && idle);
-    speed->setEnabled(connected && idle);
     position->setText(connected && state.position_mm ? QString::number(*state.position_mm, 'f', 3) : QStringLiteral("--"));
     position->setToolTip(QString());
     status->setText(ConnectionText(state.connection) + " / " + OperationText(state.operation));
