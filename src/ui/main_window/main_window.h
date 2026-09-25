@@ -26,6 +26,7 @@ class MainWindow : public QMainWindow {
 
  public slots:
   void SetControlsLocked(bool locked);
+  void SetManualRequestsPending(bool pending);
   void UpdateScanState(application::ScanState state);
   void ShowMessage(const QString& message, bool error = false);
   void ShowError(application::OperationError error);
@@ -61,6 +62,9 @@ class MainWindow : public QMainWindow {
  private:
   std::array<application::ConnectionState, 3> motor_connections_{};
   application::ConnectionState laser_connection_ = application::ConnectionState::kDisconnected;
+  std::array<application::OperationState, 3> motor_operations_{};
+  std::optional<bool> laser_output_;
+  bool manual_requests_pending_ = false;
   bool backend_available_ = false;
   bool controls_locked_ = false;
   bool has_pattern_ = false;

@@ -4,7 +4,7 @@
 #include <array>
 #include <memory>
 #include <optional>
-#include <unordered_map>
+#include <unordered_set>
 
 #include <QObject>
 
@@ -22,6 +22,7 @@ class Application : public QObject {
  public:
   explicit Application(QObject* parent = nullptr);
   ~Application() override;
+  bool HasPendingManualRequests() const { return !pending_operations_.empty(); }
 
 // UI exposed API to interact with hardware
  public slots:
@@ -49,6 +50,7 @@ class Application : public QObject {
   void LaserStateUpdated(application::LaserState state);
   
   void ControlsLocked(bool locked);
+  void ManualRequestsPending(bool pending);
   void ScanStateUpdated(application::ScanState state);
   void RequestFailed(application::OperationError error);
 
@@ -65,22 +67,18 @@ class Application : public QObject {
   enum class ApplicationState { kManual, kScanRequested, kScanning, kFailure };
   ApplicationState state_ = ApplicationState::kManual;
   
-  // Tracks an pending, unfinished command
-  struct PendingOperation {
-    std::optional<Axis> axis;
-    bool continuous_drive = false;
-  };
-
-  std::unordered_map<int, PendingOperation> pending_operations_;
+  std::unordered_set<int> pending_operations_;
 
   [[nodiscard]] int NextRequestId();
   int next_request_id_ = 1;
   
-  void TryStartScan();
-  std::optional<OperationError> ScanConnectionError() const;
-  int BeginManualRequest(std::optional<Axis> axis, bool continuous_drive = false);
+  void FinishManualRequest(int id);
+  std::optional<OperationError> ScanReadinessError() const;
+  int BeginManualRequest(std::optional<Axis> axis);
 
   std::array<ConnectionState, 3> motor_connections_{};
+  std::array<OperationState, 3> motor_operations_{};
+  std::optional<bool> laser_output_;
   ConnectionState laser_connection_ = ConnectionState::kDisconnected;
   std::array<std::unique_ptr<MotorController>, 3> motors_;
   std::unique_ptr<LaserController> laser_;

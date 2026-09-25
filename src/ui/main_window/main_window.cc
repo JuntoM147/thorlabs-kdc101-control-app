@@ -162,13 +162,16 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 
   connect(this, &MainWindow::AxisStateUpdated, this, [this](application::AxisState state) {
     const auto index = static_cast<std::size_t>(state.axis);
-    if (index >= motor_connections_.size() || motor_connections_[index] == state.connection) return;
+    if (index >= motor_connections_.size()) return;
+    if (motor_connections_[index] == state.connection && motor_operations_[index] == state.operation) return;
     motor_connections_[index] = state.connection;
+    motor_operations_[index] = state.operation;
     emit ScanAvailabilityChanged();
   });
   connect(this, &MainWindow::LaserStateUpdated, this, [this](application::LaserState state) {
-    if (laser_connection_ == state.connection) return;
+    if (laser_connection_ == state.connection && laser_output_ == state.output_enabled) return;
     laser_connection_ = state.connection;
+    laser_output_ = state.output_enabled;
     emit ScanAvailabilityChanged();
   });
   setCentralWidget(central_widget);
@@ -181,11 +184,19 @@ void MainWindow::SetBackendAvailable(bool available) {
   if (!available) {
     motor_connections_.fill(application::ConnectionState::kDisconnected);
     laser_connection_ = application::ConnectionState::kDisconnected;
+    motor_operations_.fill(application::OperationState::kIdle);
+    laser_output_.reset();
+    manual_requests_pending_ = false;
   }
   emit ManualControlsEnabled(available && !controls_locked_);
   emit ScanInputsEnabled(!controls_locked_);
   emit ScanAvailabilityChanged();
   if (lost_backend) ShowMessage(tr("Application backend is not available."), true);
+}
+
+void MainWindow::SetManualRequestsPending(bool pending) {
+  manual_requests_pending_ = pending;
+  emit ScanAvailabilityChanged();
 }
 
 void MainWindow::SetControlsLocked(bool locked) {
@@ -230,13 +241,20 @@ QStringList MainWindow::ScanStartBlockers() const {
   if (!backend_available_) reasons << tr("Application backend is unavailable.");
   if (controls_locked_ || scan_state_.phase != application::ScanPhase::kIdle)
     reasons << tr("Wait until the scan is idle and controls are unlocked.");
+  if (manual_requests_pending_) reasons << tr("Wait for pending manual commands to finish.");
   const QStringList axes{"X", "Y", "Z"};
   for (std::size_t i = 0; i < motor_connections_.size(); ++i) {
     if (motor_connections_[i] != application::ConnectionState::kConnected)
       reasons << tr("Connect the %1 motor.").arg(axes.at(i));
+    else if (motor_operations_[i] != application::OperationState::kIdle)
+      reasons << tr("Wait until the %1 axis is idle.").arg(axes.at(i));
   }
   if (laser_connection_ != application::ConnectionState::kConnected)
     reasons << tr("Connect the laser.");
+  else if (!laser_output_)
+    reasons << tr("Confirm the laser output is OFF; its state is unknown.");
+  else if (*laser_output_)
+    reasons << tr("Turn the laser output OFF.");
   if (!has_pattern_) reasons << tr("Import an image with exposed pixels.");
   if (!start_pixel_set_ || scan_configuration_.start_pixel.x >= scan_image_size_.width() ||
       scan_configuration_.start_pixel.y >= scan_image_size_.height())

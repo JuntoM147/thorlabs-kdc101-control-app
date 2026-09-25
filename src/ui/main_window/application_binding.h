@@ -27,11 +27,13 @@ void BindApplication(MainWindow& view, Application& application) {
 
   QObject::connect(&application, &Application::AxisStateUpdated, &view, &MainWindow::AxisStateUpdated);
   QObject::connect(&application, &Application::LaserStateUpdated, &view, &MainWindow::LaserStateUpdated);
+  QObject::connect(&application, &Application::ManualRequestsPending, &view, &MainWindow::SetManualRequestsPending);
   QObject::connect(&application, &Application::ControlsLocked, &view, &MainWindow::SetControlsLocked);
   QObject::connect(&application, &Application::ScanStateUpdated, &view, &MainWindow::UpdateScanState);
   QObject::connect(&application, &Application::RequestFailed, &view, &MainWindow::ShowError);
   QObject::connect(&application, &QObject::destroyed, &view, [&view] { view.SetBackendAvailable(false); });
   view.SetBackendAvailable(true);
+  view.SetManualRequestsPending(application.HasPendingManualRequests());
 }
 
 }  // namespace ui

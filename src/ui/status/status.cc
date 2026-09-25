@@ -65,7 +65,7 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
     QString text;
     switch (state.phase) {
       case ScanPhase::kIdle: text = QObject::tr("Scan idle."); break;
-      case ScanPhase::kWaiting: text = QObject::tr("Scan waiting for manual operations."); break;
+      case ScanPhase::kWaiting: text = QObject::tr("Scan requested."); break;
       case ScanPhase::kPreparing: text = QObject::tr("Preparing scan."); break;
       case ScanPhase::kRunning: text = QObject::tr("Scan running."); break;
       case ScanPhase::kPauseRequested: text = QObject::tr("Scan pause requested."); break;
