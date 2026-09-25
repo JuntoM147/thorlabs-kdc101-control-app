@@ -31,6 +31,7 @@ class Application : public QObject {
     const auto i = static_cast<unsigned>(axis);
     return i < 3 && axis_stops_[i];
   }
+  bool HasPendingLaserRequest() const { return laser_request_ != 0; }
   bool HasPendingManualRequests() const { return !pending_operations_.empty(); }
 
 // UI exposed API to interact with hardware
@@ -61,6 +62,7 @@ class Application : public QObject {
   
   void ControlsLocked(bool locked);
   void ManualRequestsPending(bool pending);
+  void LaserRequestPending(bool pending);
   void AxisRequestsPending(application::Axis axis, bool pending, bool stopping);
   void ScanStateUpdated(application::ScanState state);
   void RequestFailed(application::OperationError error);
@@ -78,6 +80,7 @@ class Application : public QObject {
   enum class ApplicationState { kManual, kScanRequested, kScanning, kFailure };
   ApplicationState state_ = ApplicationState::kManual;
   
+  int laser_request_ = 0;
   std::unordered_set<int> pending_operations_;
   std::unordered_map<int, std::pair<Axis, MotorSettings>> pending_settings_;
 

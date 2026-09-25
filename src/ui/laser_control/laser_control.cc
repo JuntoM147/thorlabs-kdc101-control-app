@@ -3,6 +3,7 @@
 #include <QLineEdit>
 #include <QCheckBox>
 #include <QPainter>
+#include <memory>
 
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -114,16 +115,22 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   QObject::connect(status, &QCheckBox::clicked, section, [&view, status] {
     emit view.SetLaserOutputRequested(status->property("outputKnown").toBool() && !status->property("outputEnabled").toBool());
   });
-  QObject::connect(&view, &MainWindow::LaserStateUpdated, section, [=](application::LaserState state) {
+  struct Availability {
+    application::LaserState state{};
+    bool pending = false;
+  };
+  const auto availability = std::make_shared<Availability>();
+  const auto refresh = [=] {
+    const auto& state = availability->state;
     const bool connected = state.connection == application::ConnectionState::kConnected;
     connect_button->setProperty("connected", connected);
     connect_button->setText(connected ? QObject::tr("Disconnect") : QObject::tr("Connect"));
-    connect_button->setEnabled(state.connection != application::ConnectionState::kConnecting);
-    channel->setEnabled(!connected && state.connection != application::ConnectionState::kConnecting);
-    status->setEnabled(connected);
+    connect_button->setEnabled(!availability->pending && state.connection != application::ConnectionState::kConnecting);
+    channel->setEnabled(!availability->pending && !connected && state.connection != application::ConnectionState::kConnecting);
+    status->setEnabled(connected && !availability->pending);
     status->setProperty("outputEnabled", state.output_enabled.value_or(false));
     status->setProperty("outputKnown", state.output_enabled.has_value());
-    status->setChecked(connected && state.output_enabled.value_or(false));
+    if (!availability->pending) status->setChecked(connected && state.output_enabled.value_or(false));
     status->setToolTip(!connected ? QObject::tr("Connect the laser to control its output.")
         : !state.output_enabled ? QObject::tr("Output state unavailable. Click to request output off.")
         : *state.output_enabled ? QObject::tr("Output on. Click to turn off. Last confirmed command, not measured emission.")
@@ -131,6 +138,14 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
     connection_status->setText(ConnectionText(state.connection));
     indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 6px;"
                                       : "background: #ed1735; border-radius: 6px;");
+  };
+  QObject::connect(&view, &MainWindow::LaserStateUpdated, section, [=](application::LaserState state) {
+    availability->state = state;
+    refresh();
+  });
+  QObject::connect(&view, &MainWindow::LaserRequestPending, section, [=](bool pending) {
+    availability->pending = pending;
+    refresh();
   });
   manual->setEnabled(false);
   QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual, &QWidget::setEnabled);

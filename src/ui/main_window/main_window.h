@@ -56,6 +56,7 @@ class MainWindow : public QMainWindow {
   void AxisStateUpdated(application::AxisState state);
   void AxisRequestsPending(application::Axis axis, bool pending, bool stopping);
   void LaserStateUpdated(application::LaserState state);
+  void LaserRequestPending(bool pending);
   void ScanDisplayChanged(application::ScanState state);
   void ManualControlsEnabled(bool enabled);
   void ScanInputsEnabled(bool enabled);

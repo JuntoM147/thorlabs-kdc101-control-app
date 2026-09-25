@@ -28,6 +28,7 @@ void BindApplication(MainWindow& view, Application& application) {
   QObject::connect(&application, &Application::AxisSettingsApplied, &view, &MainWindow::AxisSettingsApplied);
   QObject::connect(&application, &Application::AxisStateUpdated, &view, &MainWindow::AxisStateUpdated);
   QObject::connect(&application, &Application::AxisRequestsPending, &view, &MainWindow::AxisRequestsPending);
+  QObject::connect(&application, &Application::LaserRequestPending, &view, &MainWindow::LaserRequestPending);
   QObject::connect(&application, &Application::LaserStateUpdated, &view, &MainWindow::LaserStateUpdated);
   QObject::connect(&application, &Application::ManualRequestsPending, &view, &MainWindow::SetManualRequestsPending);
   QObject::connect(&application, &Application::ControlsLocked, &view, &MainWindow::SetControlsLocked);
@@ -36,6 +37,7 @@ void BindApplication(MainWindow& view, Application& application) {
   QObject::connect(&application, &QObject::destroyed, &view, [&view] { view.SetBackendAvailable(false); });
   view.SetBackendAvailable(true);
   view.SetManualRequestsPending(application.HasPendingManualRequests());
+  emit view.LaserRequestPending(application.HasPendingLaserRequest());
   for (int i = 0; i < 3; ++i) {
     const auto axis = static_cast<application::Axis>(i);
     emit view.AxisRequestsPending(axis, application.HasPendingAxisRequest(axis), application.HasPendingAxisStop(axis));

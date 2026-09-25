@@ -70,6 +70,10 @@ int Application::BeginManualRequest(std::optional<Axis> axis, bool stop) {
       return 0;
     }
   }
+  if (!axis && HasPendingLaserRequest()) {
+    emit RequestFailed({{}, "Laser request", "Wait for the laser command to finish."});
+    return 0;
+  }
   const int id = NextRequestId();
   if (!id) { emit RequestFailed({axis, "Request", "Request IDs exhausted."}); return 0; }
   const bool was_empty = pending_operations_.empty();
@@ -78,6 +82,10 @@ int Application::BeginManualRequest(std::optional<Axis> axis, bool stop) {
     const auto i = static_cast<unsigned>(*axis);
     (stop ? axis_stops_[i] : axis_requests_[i]) = id;
     emit AxisRequestsPending(*axis, true, HasPendingAxisStop(*axis));
+  }
+  if (!axis) {
+    laser_request_ = id;
+    emit LaserRequestPending(true);
   }
   if (was_empty) emit ManualRequestsPending(true);
   return id;
@@ -164,6 +172,10 @@ void Application::CancelScan() { scan_->Cancel(); }
 void Application::FinishManualRequest(int id) {
   if (!pending_operations_.erase(id)) return;
   pending_settings_.erase(id);
+  if (laser_request_ == id) {
+    laser_request_ = 0;
+    emit LaserRequestPending(false);
+  }
   for (unsigned i = 0; i < axis_requests_.size(); ++i) {
     if (axis_requests_[i] != id && axis_stops_[i] != id) continue;
     if (axis_requests_[i] == id) axis_requests_[i] = 0;
