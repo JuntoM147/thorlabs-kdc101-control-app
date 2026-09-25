@@ -80,7 +80,14 @@ void ScanController::AwaitDevice(Device device) {
 void ScanController::ContinueStopAndOff() {
   if (state_.phase != ScanPhase::kPreparing && state_.phase != ScanPhase::kStopping) return;
   if (pending_device_) return;
-  if (substep_ == 4) {
+  // Configure X and Y once, after all motors have stopped, before any scan move.
+  if (state_.phase == ScanPhase::kPreparing && substep_ >= 4 && substep_ < 6) {
+    const auto axis = substep_ - 4;
+    AwaitDevice(static_cast<Device>(axis));
+    motors_[axis].get().ConfigureForScan(configuration_.motion);
+    return;
+  }
+  if (substep_ == (state_.phase == ScanPhase::kPreparing ? 6 : 4)) {
     if (state_.phase == ScanPhase::kPreparing) {
       // Confirm OFF/stopped before potentially expensive instruction generation.
       try {
@@ -123,7 +130,7 @@ void ScanController::ExecuteNextInstruction() {
       substep_ = 1;
       if (move->dx != 0) {
         AwaitDevice(Device::kX);
-        motors_[0].get().MoveRelativeForScan(move->dx * configuration_.pixel_size_mm, configuration_.motion);
+        motors_[0].get().MoveRelativeForScan(move->dx * configuration_.pixel_size_mm);
         return;
       }
     }
@@ -131,7 +138,7 @@ void ScanController::ExecuteNextInstruction() {
       substep_ = 2;
       if (move->dy != 0) {
         AwaitDevice(Device::kY);
-        motors_[1].get().MoveRelativeForScan(move->dy * configuration_.pixel_size_mm, configuration_.motion);
+        motors_[1].get().MoveRelativeForScan(move->dy * configuration_.pixel_size_mm);
         return;
       }
     }

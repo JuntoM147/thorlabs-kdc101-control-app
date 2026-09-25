@@ -31,10 +31,11 @@ class MainWindow : public QMainWindow {
   // User intent. Application decides whether requests can be serviced.
   void ConnectMotorRequested(application::MotorConnection connection);
   void DisconnectMotorRequested(application::Axis axis);
+  void ConfigureAxisRequested(application::Axis axis, application::MotorSettings settings);
   void HomeAxisRequested(application::Axis axis);
-  void MoveAxisRequested(application::Axis axis, double position_mm, application::MotionSettings settings);
-  void JogAxisRequested(application::Axis axis, application::Direction direction, double step_mm, application::MotionSettings settings);
-  void DriveAxisRequested(application::Axis axis, application::Direction direction, application::MotionSettings settings);
+  void MoveAxisRequested(application::Axis axis, double position_mm);
+  void JogAxisRequested(application::Axis axis, application::Direction direction);
+  void DriveAxisRequested(application::Axis axis, application::Direction direction);
   void StopAxisRequested(application::Axis axis, application::StopMode mode);
   void ConnectLaserRequested(application::LaserConnection connection);
   void DisconnectLaserRequested();

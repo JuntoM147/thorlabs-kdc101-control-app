@@ -82,48 +82,71 @@ void MotorWorker::BeginMotion(int id, OperationState operation,
   }
   PollDevice();
 }
+void MotorWorker::ConfigureMotion(int id, MotorSettings settings) {
+  const auto positive = [](std::optional<double> value) {
+    return !value || (std::isfinite(*value) && *value > 0);
+  };
+  if (!Valid(settings.move) || !Valid(settings.jog) ||
+      !positive(settings.homing_speed_mm_per_second) || !positive(settings.jog_step_mm) ||
+      (settings.jog_mode && *settings.jog_mode != JogMode::kSingleStep && *settings.jog_mode != JogMode::kContinuous) ||
+      (settings.jog_stop_mode != StopMode::kProfiled && settings.jog_stop_mode != StopMode::kImmediate)) {
+    emit RequestFailed(id, {axis_, "Configure motion", "Invalid motion settings."}); return;
+  }
+  if (!motor_ || shutting_down_ || active_request_ || stop_request_) {
+    emit RequestFailed(id, {axis_, "Configure motion", "Motor is disconnected or busy."}); return;
+  }
+  auto observed = motor_->GetStatus();
+  if (!observed || Moving(*observed)) {
+    emit RequestFailed(id, {axis_, "Configure motion", observed ? "Motor is already moving."
+                                                             : observed.error().error_message()}); return;
+  }
+  // Updates are ordered, not transactional; report the first failure and never start motion.
+  auto result = motor_->SetMoveVelocity({settings.move.speed_mm_per_second,
+                                          settings.move.acceleration_mm_per_second_squared});
+  if (result.ok()) result = motor_->SetJogVelocity({settings.jog.speed_mm_per_second,
+                                                     settings.jog.acceleration_mm_per_second_squared});
+  if (result.ok() && settings.homing_speed_mm_per_second)
+    result = motor_->SetHomingSpeed(*settings.homing_speed_mm_per_second);
+  if (result.ok() && settings.jog_step_mm) result = motor_->SetJogStepSize(*settings.jog_step_mm);
+  if (result.ok() && settings.jog_mode)
+    result = motor_->SetJogMode(*settings.jog_mode == JogMode::kSingleStep
+                                   ? thorlabs::JogMode::kSingleStep : thorlabs::JogMode::kContinuous,
+                               settings.jog_stop_mode == StopMode::kProfiled
+                                   ? thorlabs::StopMode::kProfiled : thorlabs::StopMode::kImmediate);
+  if (!result.ok()) emit RequestFailed(id, {axis_, "Configure motion", result.error_message()});
+  else emit RequestCompleted(id);
+}
 void MotorWorker::Home(int id) {
   BeginMotion(id, OperationState::kHoming, [this] { return motor_->StartHome(); });
 }
-void MotorWorker::MoveAbsolute(int id, double position, MotionSettings settings) {
-  if (!std::isfinite(position) || !Valid(settings)) {
-    emit RequestFailed(id, {axis_, "Move", "Invalid position or motion settings."}); return;
+void MotorWorker::MoveAbsolute(int id, double position) {
+  if (!std::isfinite(position)) {
+    emit RequestFailed(id, {axis_, "Move", "Invalid position."}); return;
   }
-  BeginMotion(id, OperationState::kMoving, [=, this] {
-    return motor_->StartMoveAbsolute(position, settings.speed_mm_per_second.value_or(0),
-                                    settings.acceleration_mm_per_second_squared.value_or(0));
-  });
+  BeginMotion(id, OperationState::kMoving, [=, this] { return motor_->StartMoveAbsolute(position); });
 }
-void MotorWorker::MoveRelative(int id, double distance, MotionSettings settings) {
-  if (!std::isfinite(distance) || !Valid(settings)) {
-    emit RequestFailed(id, {axis_, "Move", "Invalid distance or motion settings."}); return;
+void MotorWorker::MoveRelative(int id, double distance) {
+  if (!std::isfinite(distance)) {
+    emit RequestFailed(id, {axis_, "Move", "Invalid distance."}); return;
   }
-  BeginMotion(id, OperationState::kMoving, [=, this] {
-    return motor_->StartMoveRelative(distance, settings.speed_mm_per_second.value_or(0),
-                                    settings.acceleration_mm_per_second_squared.value_or(0));
-  });
+  BeginMotion(id, OperationState::kMoving, [=, this] { return motor_->StartMoveRelative(distance); });
 }
-void MotorWorker::Jog(int id, Direction direction, double step, MotionSettings settings) {
-  if (!std::isfinite(step) || step <= 0 || !Valid(settings) ||
-      (direction != Direction::kForward && direction != Direction::kBackward)) {
-    emit RequestFailed(id, {axis_, "Jog", "Invalid direction, step or motion settings."}); return;
+void MotorWorker::Jog(int id, Direction direction) {
+  if (direction != Direction::kForward && direction != Direction::kBackward) {
+    emit RequestFailed(id, {axis_, "Jog", "Invalid direction."}); return;
   }
   BeginMotion(id, OperationState::kJogging, [=, this] {
     return motor_->StartJog(direction == Direction::kForward ? thorlabs::Direction::kForward
-                                                            : thorlabs::Direction::kBackward,
-                           step, settings.speed_mm_per_second.value_or(0),
-                           settings.acceleration_mm_per_second_squared.value_or(0));
+                                                            : thorlabs::Direction::kBackward);
   });
 }
-void MotorWorker::Drive(int id, Direction direction, MotionSettings settings) {
-  if (!Valid(settings) || (direction != Direction::kForward && direction != Direction::kBackward)) {
-    emit RequestFailed(id, {axis_, "Drive", "Invalid direction or motion settings."}); return;
+void MotorWorker::Drive(int id, Direction direction) {
+  if (direction != Direction::kForward && direction != Direction::kBackward) {
+    emit RequestFailed(id, {axis_, "Drive", "Invalid direction."}); return;
   }
   BeginMotion(id, OperationState::kDriving, [=, this] {
     return motor_->StartDrive(direction == Direction::kForward ? thorlabs::Direction::kForward
-                                                              : thorlabs::Direction::kBackward,
-                             settings.speed_mm_per_second.value_or(0),
-                             settings.acceleration_mm_per_second_squared.value_or(0));
+                                                              : thorlabs::Direction::kBackward);
   });
 }
 void MotorWorker::Stop(int id, StopMode mode) {

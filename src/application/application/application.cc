@@ -57,17 +57,20 @@ void Application::ConnectMotor(MotorConnection connection) {
 void Application::DisconnectMotor(Axis axis) {
   if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Disconnect(id);
 }
+void Application::ConfigureAxis(Axis axis, MotorSettings settings) {
+  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->ConfigureMotion(id, settings);
+}
 void Application::HomeAxis(Axis axis) {
   if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Home(id);
 }
-void Application::MoveAxis(Axis axis, double position, MotionSettings settings) {
-  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->MoveAbsolute(id, position, settings);
+void Application::MoveAxis(Axis axis, double position) {
+  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->MoveAbsolute(id, position);
 }
-void Application::JogAxis(Axis axis, Direction direction, double step, MotionSettings settings) {
-  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Jog(id, direction, step, settings);
+void Application::JogAxis(Axis axis, Direction direction) {
+  if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Jog(id, direction);
 }
-void Application::DriveAxis(Axis axis, Direction direction, MotionSettings settings) {
-  if (int id = BeginManualRequest(axis, true)) motors_[static_cast<int>(axis)]->Drive(id, direction, settings);
+void Application::DriveAxis(Axis axis, Direction direction) {
+  if (int id = BeginManualRequest(axis, true)) motors_[static_cast<int>(axis)]->Drive(id, direction);
 }
 void Application::StopAxis(Axis axis, StopMode mode) {
   if (int id = BeginManualRequest(axis)) motors_[static_cast<int>(axis)]->Stop(id, mode);

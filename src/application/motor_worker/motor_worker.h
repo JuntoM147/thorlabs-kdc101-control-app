@@ -24,11 +24,12 @@ class MotorWorker : public QObject {
  public slots:
   void Connect(int id, MotorConnection connection);
   void Disconnect(int id);
+  void ConfigureMotion(int id, MotorSettings settings);
   void Home(int id);
-  void MoveAbsolute(int id, double position_mm, MotionSettings settings);
-  void MoveRelative(int id, double distance_mm, MotionSettings settings);
-  void Jog(int id, Direction direction, double step_mm, MotionSettings settings);
-  void Drive(int id, Direction direction, MotionSettings settings);
+  void MoveAbsolute(int id, double position_mm);
+  void MoveRelative(int id, double distance_mm);
+  void Jog(int id, Direction direction);
+  void Drive(int id, Direction direction);
   void Stop(int id, StopMode mode);
   void Shutdown();
 

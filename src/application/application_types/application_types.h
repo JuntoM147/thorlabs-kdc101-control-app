@@ -37,6 +37,17 @@ struct MotionSettings {
   std::optional<double> acceleration_mm_per_second_squared;
 };
 
+enum class JogMode { kSingleStep, kContinuous };
+
+struct MotorSettings {
+  MotionSettings move;
+  MotionSettings jog;
+  std::optional<double> homing_speed_mm_per_second;
+  std::optional<double> jog_step_mm;
+  std::optional<JogMode> jog_mode;
+  StopMode jog_stop_mode = StopMode::kProfiled;
+};
+
 struct ScanConfiguration {
   algo::BinaryMatrix pattern;
   // Pixel mapped to the current physical X/Y position.
@@ -87,6 +98,7 @@ Q_DECLARE_METATYPE(application::OperationError)
 Q_DECLARE_METATYPE(application::MotorConnection)
 Q_DECLARE_METATYPE(application::LaserConnection)
 Q_DECLARE_METATYPE(application::MotionSettings)
+Q_DECLARE_METATYPE(application::MotorSettings)
 Q_DECLARE_METATYPE(application::AxisState)
 Q_DECLARE_METATYPE(application::LaserState)
 Q_DECLARE_METATYPE(application::ScanConfiguration)

@@ -57,32 +57,48 @@ void MotorController::Disconnect(int id) {
   auto* worker = worker_.data();
   QMetaObject::invokeMethod(worker, [worker, id] { worker->Disconnect(id); }, Qt::QueuedConnection);
 }
+void MotorController::ConfigureMotion(int id, MotorSettings settings) {
+  Dispatch(id, [=](MotorWorker& worker) { worker.ConfigureMotion(id, settings); });
+}
 void MotorController::Home(int id) {
   Dispatch(id, [=](MotorWorker& worker) { worker.Home(id); });
 }
-void MotorController::MoveAbsolute(int id, double position, MotionSettings settings) {
-  Dispatch(id, [=](MotorWorker& worker) { worker.MoveAbsolute(id, position, settings); });
+void MotorController::MoveAbsolute(int id, double position) {
+  Dispatch(id, [=](MotorWorker& worker) { worker.MoveAbsolute(id, position); });
 }
-void MotorController::MoveRelative(int id, double distance, MotionSettings settings) {
-  Dispatch(id, [=](MotorWorker& worker) { worker.MoveRelative(id, distance, settings); });
+void MotorController::MoveRelative(int id, double distance) {
+  Dispatch(id, [=](MotorWorker& worker) { worker.MoveRelative(id, distance); });
 }
-void MotorController::Jog(int id, Direction direction, double step, MotionSettings settings) {
-  Dispatch(id, [=](MotorWorker& worker) { worker.Jog(id, direction, step, settings); });
+void MotorController::Jog(int id, Direction direction) {
+  Dispatch(id, [=](MotorWorker& worker) { worker.Jog(id, direction); });
 }
-void MotorController::Drive(int id, Direction direction, MotionSettings settings) {
-  Dispatch(id, [=](MotorWorker& worker) { worker.Drive(id, direction, settings); });
+void MotorController::Drive(int id, Direction direction) {
+  Dispatch(id, [=](MotorWorker& worker) { worker.Drive(id, direction); });
 }
 void MotorController::Stop(int id, StopMode mode) {
   Dispatch(id, [=](MotorWorker& worker) { worker.Stop(id, mode); });
 }
-void MotorController::MoveRelativeForScan(double distance, MotionSettings settings) {
+void MotorController::ConfigureForScan(MotionSettings settings) {
+  if (scan_request_ || scan_stop_request_) {
+    emit ScanOperationFailed(axis_, {axis_, "Configure scan motion", "An operation is already pending."}); return;
+  }
+  const int id = NextScanRequestId();
+  if (!id) { emit ScanOperationFailed(axis_, {axis_, "Configure scan motion", "Request IDs exhausted."}); return; }
+  scan_request_ = id;
+  Dispatch(id, [=](MotorWorker& worker) {
+    MotorSettings configuration;
+    configuration.move = settings;
+    worker.ConfigureMotion(id, configuration);
+  });
+}
+void MotorController::MoveRelativeForScan(double distance) {
   if (scan_request_ || scan_stop_request_) {
     emit ScanOperationFailed(axis_, {axis_, "Scan move", "An operation is already pending."}); return;
   }
   const int id = NextScanRequestId();
   if (!id) { emit ScanOperationFailed(axis_, {axis_, "Scan move", "Request IDs exhausted."}); return; }
   scan_request_ = id;
-  Dispatch(id, [=](MotorWorker& worker) { worker.MoveRelative(id, distance, settings); });
+  Dispatch(id, [=](MotorWorker& worker) { worker.MoveRelative(id, distance); });
 }
 void MotorController::StopForScan(StopMode mode) {
   if (scan_request_ || scan_stop_request_) {

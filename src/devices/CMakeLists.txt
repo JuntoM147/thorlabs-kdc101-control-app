@@ -55,3 +55,10 @@ add_library(ni_daq_laser STATIC
 target_compile_features(ni_daq_laser PUBLIC cxx_std_23)
 target_include_directories(ni_daq_laser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${NIDAQMX_INCLUDE_DIR}")
 target_link_libraries(ni_daq_laser PUBLIC device_status "${NIDAQMX_LIBRARY}")
+
+if(BUILD_TESTING AND DEVICES_USE_FAKE_KINESIS)
+    add_executable(kdc101_nonblocking_test ../../tests/kdc101/nonblocking_test.cc)
+    target_include_directories(kdc101_nonblocking_test PRIVATE ../../tests/kdc101/fake_sdk)
+    target_link_libraries(kdc101_nonblocking_test PRIVATE kinesis_devices)
+    add_test(NAME kdc101_nonblocking_test COMMAND kdc101_nonblocking_test)
+endif()

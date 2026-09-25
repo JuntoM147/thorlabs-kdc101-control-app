@@ -11,6 +11,7 @@ template <typename Application>
 void BindApplication(MainWindow& view, Application& application) {
   QObject::connect(&view, &MainWindow::ConnectMotorRequested, &application, &Application::ConnectMotor);
   QObject::connect(&view, &MainWindow::DisconnectMotorRequested, &application, &Application::DisconnectMotor);
+  QObject::connect(&view, &MainWindow::ConfigureAxisRequested, &application, &Application::ConfigureAxis);
   QObject::connect(&view, &MainWindow::HomeAxisRequested, &application, &Application::HomeAxis);
   QObject::connect(&view, &MainWindow::MoveAxisRequested, &application, &Application::MoveAxis);
   QObject::connect(&view, &MainWindow::JogAxisRequested, &application, &Application::JogAxis);

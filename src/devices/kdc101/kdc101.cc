@@ -210,48 +210,36 @@ std::expected<int, DeviceStatus> ConvertMotionParameter(const std::string& seria
     }
 
     return device_units;
+}
+
+
+DeviceStatus ApplyVelocity(const std::string& serial_number, VelocityParameters update, bool jog) {
+    std::optional<int> speed, acceleration;
+    if (update.speed_mm_per_second) {
+        auto converted = ConvertMotionParameter(serial_number, *update.speed_mm_per_second, kUnitTypeSpeed);
+        if (!converted) return converted.error();
+        speed = *converted;
     }
-
-
-DeviceStatus ApplyMotionParameters(const std::string& serial_number, double speed, double acceleration, bool jog) {
-    if (!std::isfinite(speed) || !std::isfinite(acceleration) || speed < 0.0 || acceleration < 0.0) {
-        return DeviceStatus::FromKinesis(FT_InvalidParameter);
+    if (update.acceleration_mm_per_second_squared) {
+        auto converted = ConvertMotionParameter(serial_number, *update.acceleration_mm_per_second_squared, kUnitTypeAcceleration);
+        if (!converted) return converted.error();
+        acceleration = *converted;
     }
-
-    if (speed == 0.0 && acceleration == 0.0) {
-        return DeviceStatus::Ok();
-    }
-
-    int device_speed = 0;
-    int device_acceleration = 0;
+    if (!speed && !acceleration) return DeviceStatus::Ok();
+    int device_speed = 0, device_acceleration = 0;
     const char* serial = serial_number.c_str();
     auto status = DeviceStatus::FromKinesis(jog
         ? CC_GetJogVelParams(serial, &device_acceleration, &device_speed)
         : CC_GetVelParams(serial, &device_acceleration, &device_speed));
-
-    if (!status.ok()) {
-        return status;
-    }
-
-    if (speed > 0.0) {
-        auto converted = ConvertMotionParameter(serial_number, speed, kUnitTypeSpeed);
-        if (!converted) {
-        return converted.error();
-        }
-        device_speed = *converted;
-    }
-    if (acceleration > 0.0) {
-        auto converted = ConvertMotionParameter(
-            serial_number, acceleration, kUnitTypeAcceleration);
-        if (!converted) {
-        return converted.error();
-        }
-        device_acceleration = *converted;
-    }
+    if (!status.ok()) return status;
+    // Compare device units, so equivalent real values do not cause redundant writes.
+    if (speed.value_or(device_speed) == device_speed &&
+        acceleration.value_or(device_acceleration) == device_acceleration)
+        return DeviceStatus::Ok();
     return DeviceStatus::FromKinesis(jog
-        ? CC_SetJogVelParams(serial, device_acceleration, device_speed)
-        : CC_SetVelParams(serial, device_acceleration, device_speed));
-    }
+        ? CC_SetJogVelParams(serial, acceleration.value_or(device_acceleration), speed.value_or(device_speed))
+        : CC_SetVelParams(serial, acceleration.value_or(device_acceleration), speed.value_or(device_speed)));
+}
 
 }
 
@@ -270,55 +258,43 @@ KDC101::PositionResult KDC101::GetPosition()
 }
 
 
-DeviceStatus KDC101::StartHome(double speed)
-{
-    if (!std::isfinite(speed) || speed < 0.0) {
+DeviceStatus KDC101::SetMoveVelocity(VelocityParameters parameters) {
+    return ApplyVelocity(serial_number_, parameters, false);
+}
+
+DeviceStatus KDC101::SetJogVelocity(VelocityParameters parameters) {
+    return ApplyVelocity(serial_number_, parameters, true);
+}
+
+DeviceStatus KDC101::SetHomingSpeed(double speed) {
+    auto converted = ConvertMotionParameter(serial_number_, speed, kUnitTypeSpeed);
+    if (!converted) return converted.error();
+    return DeviceStatus::FromKinesis(CC_SetHomingVelocity(serial_number_.c_str(), static_cast<unsigned int>(*converted)));
+}
+
+DeviceStatus KDC101::SetJogStepSize(double step) {
+    auto converted = ConvertMotionParameter(serial_number_, step, kUnitTypeDistance);
+    if (!converted) return converted.error();
+    return DeviceStatus::FromKinesis(CC_SetJogStepSize(serial_number_.c_str(), static_cast<unsigned int>(*converted)));
+}
+
+DeviceStatus KDC101::SetJogMode(JogMode mode, StopMode stop_mode) {
+    if ((mode != JogMode::kSingleStep && mode != JogMode::kContinuous) ||
+        (stop_mode != StopMode::kProfiled && stop_mode != StopMode::kImmediate))
         return DeviceStatus::FromKinesis(FT_InvalidParameter);
-    }
+    return DeviceStatus::FromKinesis(CC_SetJogMode(serial_number_.c_str(),
+        mode == JogMode::kSingleStep ? MOT_JogModes::MOT_SingleStep : MOT_JogModes::MOT_Continuous,
+        stop_mode == StopMode::kProfiled ? MOT_StopModes::MOT_Profiled : MOT_StopModes::MOT_Immediate));
+}
 
-    if (speed > 0.0) {
-        auto converted = ConvertMotionParameter(serial_number_, speed, kUnitTypeSpeed);
-        if (!converted) {
-            return converted.error();
-        }
-        auto status = DeviceStatus::FromKinesis(CC_SetHomingVelocity(serial_number_.c_str(), static_cast<unsigned int>(*converted)));
-        if (!status.ok()) {
-            return status;
-        }
-    }
-
+DeviceStatus KDC101::StartHome() {
     return DeviceStatus::FromKinesis(CC_Home(serial_number_.c_str()));
 }
 
-
-DeviceStatus KDC101::StartJog(Direction dir, double step_size, double speed, double acceleration)
+DeviceStatus KDC101::StartJog(Direction dir)
 {
-    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, true);
-    if (!velocity_status.ok()) {
-        return velocity_status;
-    }
-
-
-    int device_unit;
-    DeviceStatus conversion_status = DeviceStatus::FromKinesis(CC_GetDeviceUnitFromRealValue(serial_number_.c_str(),
-                                                                                             step_size,
-                                                                                             &device_unit,
-                                                                                             kUnitTypeDistance));
-
-    if (!conversion_status.ok()) {
-        return conversion_status;
-    }
-
-    DeviceStatus jog_mode_status = DeviceStatus::FromKinesis(CC_SetJogMode(serial_number_.c_str(), MOT_JogModes::MOT_SingleStep, MOT_StopModes::MOT_Profiled));
-    if (!jog_mode_status.ok()) {
-        return jog_mode_status;
-    }
-
-    DeviceStatus set_step_size_status = DeviceStatus::FromKinesis(CC_SetJogStepSize(serial_number_.c_str(), static_cast<unsigned int>(device_unit)));
-    if (!set_step_size_status.ok()) {
-        return set_step_size_status;
-    }
-
+    if (dir != Direction::kForward && dir != Direction::kBackward)
+        return DeviceStatus::FromKinesis(FT_InvalidParameter);
     MOT_TravelDirection mot_direction;
 
     if (dir == Direction::kForward) {
@@ -331,12 +307,10 @@ DeviceStatus KDC101::StartJog(Direction dir, double step_size, double speed, dou
 }
 
 
-DeviceStatus KDC101::StartDrive(Direction dir, double speed, double acceleration)
+DeviceStatus KDC101::StartDrive(Direction dir)
 {
-    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, false);
-    if (!velocity_status.ok()) {
-        return velocity_status;
-    }
+    if (dir != Direction::kForward && dir != Direction::kBackward)
+        return DeviceStatus::FromKinesis(FT_InvalidParameter);
 
     MOT_TravelDirection mot_direction;
 
@@ -346,7 +320,7 @@ DeviceStatus KDC101::StartDrive(Direction dir, double speed, double acceleration
         mot_direction = MOT_TravelDirection::MOT_Backwards;
     }
 
-     return DeviceStatus::FromKinesis(CC_MoveAtVelocity(serial_number_.c_str(), mot_direction));
+    return DeviceStatus::FromKinesis(CC_MoveAtVelocity(serial_number_.c_str(), mot_direction));
 }
 
 
@@ -360,13 +334,9 @@ DeviceStatus KDC101::Stop(StopMode stop_mode)
 }
 
 
-DeviceStatus KDC101::StartMoveAbsolute(double position, double speed, double acceleration)
+DeviceStatus KDC101::StartMoveAbsolute(double position)
 {
-    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, false);
-    if (!velocity_status.ok()) {
-        return velocity_status;
-    }
-
+    if (!std::isfinite(position)) return DeviceStatus::FromKinesis(FT_InvalidParameter);
 
     // convert to device units
     int device_unit;
@@ -383,15 +353,10 @@ DeviceStatus KDC101::StartMoveAbsolute(double position, double speed, double acc
 }
 
 
-DeviceStatus KDC101::StartMoveRelative(double distance, double speed, double acceleration)
+DeviceStatus KDC101::StartMoveRelative(double distance)
 {
     if (!std::isfinite(distance)) {
         return DeviceStatus::FromKinesis(FT_InvalidParameter);
-    }
-
-    auto velocity_status = ApplyMotionParameters(serial_number_, speed, acceleration, false);
-    if (!velocity_status.ok()) {
-        return velocity_status;
     }
 
     int device_units = 0;

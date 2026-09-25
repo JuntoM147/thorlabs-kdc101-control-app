@@ -149,39 +149,48 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   command_grid->addWidget(step_size, 2, 3);
   command_grid->addLayout(inputs, 2, 0);
 
-  auto jog = [&view, axis_id, step_size](application::Direction direction) {
+  auto* apply_step = CreateCommandButton(QObject::tr("Apply step"), section);
+  apply_step->setAccessibleName(QObject::tr("Apply %1 axis jog step").arg(axis));
+  command_grid->addWidget(apply_step, 3, 3);
+  step_size->setToolTip(QObject::tr("Choose a step in mm, then click Apply step. Jog uses the applied device settings."));
+  QObject::connect(apply_step, &QPushButton::clicked, section, [&view, axis_id, step_size] {
     bool ok = false;
     const double step = QLocale::c().toDouble(step_size->currentText(), &ok);
     if (!ok || !step_size->lineEdit()->hasAcceptableInput() || step <= 0) {
-      view.ShowError({axis_id, "Jog", "Enter a positive step size in mm."});
-      return;
+      view.ShowError({axis_id, "Configure jog", "Enter a positive step size in mm."}); return;
     }
-    emit view.JogAxisRequested(axis_id, direction, step, {});
+    application::MotorSettings settings;
+    settings.jog_step_mm = step;
+    settings.jog_mode = application::JogMode::kSingleStep;
+    emit view.ConfigureAxisRequested(axis_id, settings);
+  });
+  auto jog = [&view, axis_id](application::Direction direction) {
+    emit view.JogAxisRequested(axis_id, direction);
   };
   QObject::connect(jog_up, &QPushButton::clicked, section, [jog] { jog(application::Direction::kForward); });
   QObject::connect(jog_down, &QPushButton::clicked, section, [jog] { jog(application::Direction::kBackward); });
   QObject::connect(drive_up, &QPushButton::clicked, section, [&view, axis_id] {
-    emit view.DriveAxisRequested(axis_id, application::Direction::kForward, {});
+    emit view.DriveAxisRequested(axis_id, application::Direction::kForward);
   });
   QObject::connect(drive_down, &QPushButton::clicked, section, [&view, axis_id] {
-    emit view.DriveAxisRequested(axis_id, application::Direction::kBackward, {});
+    emit view.DriveAxisRequested(axis_id, application::Direction::kBackward);
   });
   QObject::connect(home, &QPushButton::clicked, section, [&view, axis_id] { emit view.HomeAxisRequested(axis_id); });
   QObject::connect(stop, &QPushButton::clicked, section, [&view, axis_id] {
     emit view.StopAxisRequested(axis_id, application::StopMode::kProfiled);
   });
   QObject::connect(go_button, &QPushButton::clicked, section, [&view, axis_id, absolute_position] {
-    emit view.MoveAxisRequested(axis_id, absolute_position->value(), {});
+    emit view.MoveAxisRequested(axis_id, absolute_position->value());
   });
   go_button->setAccessibleName(QObject::tr("Move %1 axis").arg(axis));
-  for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, stop, go_button}) {
+  for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, stop, go_button, apply_step}) {
     button->setToolTip(QString());
   }
   QObject::connect(&view, &MainWindow::AxisStateUpdated, section, [=](application::AxisState state) {
     if (state.axis != axis_id) return;
     const bool connected = state.connection == application::ConnectionState::kConnected;
     const bool idle = state.operation == application::OperationState::kIdle;
-    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button}) {
+    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button, apply_step}) {
       button->setEnabled(connected && idle);
     }
     stop->setEnabled(connected);

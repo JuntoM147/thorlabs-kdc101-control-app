@@ -27,10 +27,11 @@ class Application : public QObject {
  public slots:
   void ConnectMotor(MotorConnection connection);
   void DisconnectMotor(Axis axis);
+  void ConfigureAxis(Axis axis, MotorSettings settings);
   void HomeAxis(Axis axis);
-  void MoveAxis(Axis axis, double position_mm, MotionSettings settings);
-  void JogAxis(Axis axis, Direction direction, double step_mm, MotionSettings settings);
-  void DriveAxis(Axis axis, Direction direction, MotionSettings settings);
+  void MoveAxis(Axis axis, double position_mm);
+  void JogAxis(Axis axis, Direction direction);
+  void DriveAxis(Axis axis, Direction direction);
   void StopAxis(Axis axis, StopMode mode);
 
   void ConnectLaser(LaserConnection connection);

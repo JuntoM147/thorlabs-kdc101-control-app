@@ -21,9 +21,14 @@ enum class StopMode {
     kImmediate
 };
 
-constexpr double kDefaultSpeed = 0.0;
-constexpr double kDefaultAcceleration = 0.0;
-constexpr double kDefaultStepSize = 0.0;
+enum class JogMode { kSingleStep, kContinuous };
+
+// Missing fields preserve the current device values
+struct VelocityParameters {
+    std::optional<double> speed_mm_per_second;
+    std::optional<double> acceleration_mm_per_second_squared;
+};
+
 constexpr int kDefaultPollingIntervalMs = 200;
 
 // Represents device messages from the message queue
@@ -70,13 +75,20 @@ class KDC101 {
         [[nodiscard]] PositionResult GetPosition();
         [[nodiscard]] std::expected<MotorStatus, DeviceStatus> GetStatus();
 
+        // Configuration only, doesn't start movement
+        [[nodiscard]] DeviceStatus SetMoveVelocity(VelocityParameters parameters);
+        [[nodiscard]] DeviceStatus SetJogVelocity(VelocityParameters parameters);
+        [[nodiscard]] DeviceStatus SetHomingSpeed(double speed_mm_per_second);
+        [[nodiscard]] DeviceStatus SetJogStepSize(double step_mm);
+        [[nodiscard]] DeviceStatus SetJogMode(JogMode mode, StopMode stop_mode);
+
         // Methods to start a motor operation (non-blocking)
-        [[nodiscard]] DeviceStatus StartHome(double speed = kDefaultSpeed);
-        [[nodiscard]] DeviceStatus StartJog(Direction dir, double step_size = kDefaultStepSize, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
-        [[nodiscard]] DeviceStatus StartDrive(Direction dir, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceStatus StartHome();
+        [[nodiscard]] DeviceStatus StartJog(Direction dir);
+        [[nodiscard]] DeviceStatus StartDrive(Direction dir);
         [[nodiscard]] DeviceStatus Stop(StopMode stop_mode = StopMode::kProfiled);
-        [[nodiscard]] DeviceStatus StartMoveAbsolute(double position, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
-        [[nodiscard]] DeviceStatus StartMoveRelative(double distance, double speed = kDefaultSpeed, double acceleration = kDefaultAcceleration);
+        [[nodiscard]] DeviceStatus StartMoveAbsolute(double position);
+        [[nodiscard]] DeviceStatus StartMoveRelative(double distance);
 
         [[nodiscard]] EventResult GetNextEvent();
         [[nodiscard]] DeviceStatus CheckConnection() const;
