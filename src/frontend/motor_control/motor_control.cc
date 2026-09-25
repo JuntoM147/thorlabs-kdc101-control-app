@@ -61,16 +61,21 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   auto* position_label = new QLabel(QObject::tr("Current position"), section);
   position_label->setObjectName(QStringLiteral("axisFieldLabel"));
   manual->addWidget(position_label);
-  auto* readout = new QHBoxLayout();
+  auto* readout_widget = new QWidget(section);
+  readout_widget->setFixedHeight(32);
+  readout_widget->setObjectName(QStringLiteral("axisReadout"));
+  readout_widget->setStyleSheet("QWidget#axisReadout { background: transparent; }");
+  auto* readout = new QHBoxLayout(readout_widget);
+  readout->setContentsMargins(0, 0, 0, 0);
   readout->setSpacing(6);
-  auto* position = new QLabel(QObject::tr("Unknown"), section);
+  auto* position = new QLabel(QStringLiteral("--"), section);
   position->setAccessibleName(QObject::tr("%1 axis current position").arg(axis));
   position->setStyleSheet("font-size: 24px; font-weight: 600;");
   position->setToolTip(QObject::tr("Position is unavailable until the motor is connected."));
   readout->addWidget(position);
   readout->addWidget(new QLabel(QObject::tr("mm"), section), 0, Qt::AlignBottom);
   readout->addStretch();
-  manual->addLayout(readout);
+  manual->addWidget(readout_widget);
   manual->addStretch();
 
   auto* jog_down = CreateCommandButton(QStringLiteral("<"), section);
@@ -173,10 +178,10 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   inputs->addWidget(new QLabel(QObject::tr("mm"), section), 3, 1);
   step_size->setEnabled(false);
 
-  auto* apply_step = CreateCommandButton(QObject::tr("Apply step"), section);
+  auto* apply_step = CreateCommandButton(QObject::tr("Apply"), section);
   apply_step->setAccessibleName(QObject::tr("Apply %1 axis jog step").arg(axis));
   inputs->addWidget(apply_step, 3, 2);
-  step_size->setToolTip(QObject::tr("Choose a step in mm, then click Apply step. Jog uses the applied device settings."));
+  step_size->setToolTip(QObject::tr("Choose a step in mm, then click Apply. Jog uses the applied device settings."));
   QObject::connect(apply_step, &QPushButton::clicked, section, [&view, axis_id, step_size] {
     bool ok = false;
     const double step = QLocale::c().toDouble(step_size->currentText(), &ok);
@@ -202,7 +207,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   speed->setToolTip(QObject::tr("Apply speed to moves, jogging and homing. Acceleration is unchanged."));
   inputs->addWidget(speed, 5, 0);
   inputs->addWidget(new QLabel(QObject::tr("mm/s"), section), 5, 1);
-  auto* apply_speed = CreateCommandButton(QObject::tr("Apply speed"), section);
+  auto* apply_speed = CreateCommandButton(QObject::tr("Apply"), section);
   apply_speed->setAccessibleName(QObject::tr("Apply %1 axis speed").arg(axis));
   inputs->addWidget(apply_speed, 5, 2);
   QObject::connect(apply_speed, &QPushButton::clicked, section, [&view, axis_id, speed] {
@@ -257,7 +262,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
     absolute_position->setEnabled(connected && idle);
     step_size->setEnabled(connected && idle);
     speed->setEnabled(connected && idle);
-    position->setText(state.position_mm ? QString::number(*state.position_mm, 'f', 3) : QObject::tr("Unknown"));
+    position->setText(connected && state.position_mm ? QString::number(*state.position_mm, 'f', 3) : QStringLiteral("--"));
     position->setToolTip(QString());
     status->setText(ConnectionText(state.connection) + " / " + OperationText(state.operation));
     indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 4px;"

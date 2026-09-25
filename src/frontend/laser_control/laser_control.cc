@@ -1,10 +1,9 @@
 #include "laser_control.h"
 #include "main_window/display_text.h"
 #include <QLineEdit>
-#include <QSpinBox>
-#include <QStyle>
+#include <QCheckBox>
+#include <QPainter>
 
-#include <QDoubleSpinBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -13,13 +12,52 @@
 #include <QSizePolicy>
 
 namespace ui {
+namespace {
+
+// Keep native checkbox keyboard/accessibility behavior, but draw a compact switch.
+class OutputSwitch : public QCheckBox {
+ public:
+  explicit OutputSwitch(QWidget* parent) : QCheckBox(parent) {
+    setFixedSize(48, 28);
+    setFocusPolicy(Qt::StrongFocus);
+    setCursor(Qt::PointingHandCursor);
+  }
+
+ protected:
+  bool hitButton(const QPoint& point) const override { return rect().contains(point); }
+  // The device observation confirms changes, not the click itself.
+  void nextCheckState() override {}
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QColor track = !isEnabled() ? QColor("#e0e5ec")
+        : isChecked() ? QColor("#126bf0") : QColor("#8794a8");
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(track);
+    painter.drawRoundedRect(QRectF(2, 3, 44, 22), 11, 11);
+    painter.setBrush(isEnabled() ? QColor("#ffffff") : QColor("#f3f5f8"));
+    painter.drawEllipse(QRectF(isChecked() ? 26 : 5, 6, 16, 16));
+    if (hasFocus()) {
+      painter.setBrush(Qt::NoBrush);
+      painter.setPen(QPen(QColor("#126bf0"), 1, Qt::DashLine));
+      painter.drawRoundedRect(QRectF(0.5, 0.5, 47, 27), 13, 13);
+    }
+  }
+};
+
+}  // namespace
+
 
 QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("Laser control"), parent);
 
+  section->setObjectName(QStringLiteral("laser_control"));
   auto* outer_layout = new QVBoxLayout(section);
   auto* manual = new QWidget(section);
+  manual->setObjectName(QStringLiteral("laserManual"));
+  manual->setStyleSheet("QWidget#laserManual { background: transparent; }");
   auto* layout = new QVBoxLayout(manual);
+  layout->setContentsMargins(0, 0, 0, 0);
   outer_layout->addWidget(manual);
   layout->setSpacing(16);
 
@@ -48,15 +86,18 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   connect_button->setProperty("connected", false);
   layout->addWidget(connect_button);
 
-  auto* status = new QPushButton(QObject::tr("Output unknown"), section);
-  status->setObjectName(QStringLiteral("laserStatus"));
+  auto* output_row = new QHBoxLayout();
+  auto* output_label = new QLabel(QObject::tr("Laser output"), section);
+  auto* status = new OutputSwitch(section);
+  status->setObjectName(QStringLiteral("laserOutputSwitch"));
   status->setAccessibleName(QObject::tr("Laser output status"));
   status->setEnabled(false);
-  status->setMinimumWidth(120);
-  status->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  status->setToolTip(QObject::tr("Last successful output command; not measured emission."));
-  layout->addWidget(status);
-
+  status->setToolTip(QObject::tr("Connect the laser to control its output."));
+  output_label->setBuddy(status);
+  output_row->addWidget(output_label);
+  output_row->addStretch();
+  output_row->addWidget(status);
+  layout->addLayout(output_row);
 
   auto* channel = new QLineEdit(QStringLiteral("Dev1/port0/line0"), section);
   channel->setAccessibleName(QObject::tr("Laser digital output channel"));
@@ -70,7 +111,7 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
       emit view.ConnectLaserRequested({channel->text().trimmed().toStdString()});
     }
   });
-  QObject::connect(status, &QPushButton::clicked, section, [&view, status] {
+  QObject::connect(status, &QCheckBox::clicked, section, [&view, status] {
     emit view.SetLaserOutputRequested(status->property("outputKnown").toBool() && !status->property("outputEnabled").toBool());
   });
   QObject::connect(&view, &MainWindow::LaserStateUpdated, section, [=](application::LaserState state) {
@@ -82,47 +123,18 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
     status->setEnabled(connected);
     status->setProperty("outputEnabled", state.output_enabled.value_or(false));
     status->setProperty("outputKnown", state.output_enabled.has_value());
-    status->setText(!state.output_enabled ? QObject::tr("Output unknown")
-                      : *state.output_enabled ? QObject::tr("Laser ON") : QObject::tr("Laser OFF"));
-    
-    status->setProperty("outputOn", state.output_enabled.value_or(false));
-    status->style()->unpolish(status);
-    status->style()->polish(status);
+    status->setChecked(connected && state.output_enabled.value_or(false));
+    status->setToolTip(!connected ? QObject::tr("Connect the laser to control its output.")
+        : !state.output_enabled ? QObject::tr("Output state unavailable. Click to request output off.")
+        : *state.output_enabled ? QObject::tr("Output on. Click to turn off. Last confirmed command, not measured emission.")
+                                : QObject::tr("Output off. Click to turn on. Last confirmed command, not measured emission."));
     connection_status->setText(ConnectionText(state.connection));
     indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 6px;"
                                       : "background: #ed1735; border-radius: 6px;");
   });
   manual->setEnabled(false);
   QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual, &QWidget::setEnabled);
-  auto* pixel_row = new QHBoxLayout();
-  auto* pixel_label = new QLabel(QObject::tr("Pixel size (\u00b5m)"), section);
-
-  auto* pixel_size = new QDoubleSpinBox(section);
-  pixel_size->setMinimumWidth(100);
-  pixel_size->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  pixel_size->setDecimals(3);
-  pixel_size->setRange(0.001, 1000000.0);
-  pixel_size->setSingleStep(0.01);
-  pixel_size->setValue(0.1);
-  pixel_size->setAccessibleName(QObject::tr("Pixel size in micrometres"));
-  pixel_label->setBuddy(pixel_size);
-  pixel_row->addWidget(pixel_label);
-  pixel_row->addWidget(pixel_size, 1);
-  outer_layout->addLayout(pixel_row);
-
-  auto* exposure = new QSpinBox(section);
-  exposure->setRange(0, 3600000);
-  exposure->setSuffix(QObject::tr(" ms"));
-  exposure->setAccessibleName(QObject::tr("Exposure time in milliseconds"));
-  outer_layout->addWidget(new QLabel(QObject::tr("Exposure time"), section));
-  outer_layout->addWidget(exposure);
   outer_layout->addStretch();
-
-  view.SetPixelSize(pixel_size->value());
-  QObject::connect(pixel_size, &QDoubleSpinBox::valueChanged, &view, &MainWindow::SetPixelSize);
-  QObject::connect(exposure, &QSpinBox::valueChanged, &view, &MainWindow::SetExposureTime);
-  QObject::connect(&view, &MainWindow::ScanInputsEnabled, pixel_size, &QWidget::setEnabled);
-  QObject::connect(&view, &MainWindow::ScanInputsEnabled, exposure, &QWidget::setEnabled);
 
   return section;
 }

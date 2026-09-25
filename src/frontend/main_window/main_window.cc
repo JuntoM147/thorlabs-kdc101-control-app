@@ -1,7 +1,6 @@
 #include "main_window/main_window.h"
 
 #include <QHBoxLayout>
-#include <QStatusBar>
 #include <QStringList>
 #include <QWidget>
 #include <QVBoxLayout>
@@ -9,7 +8,9 @@
 
 #include "motor_information/motor_information.h"
 #include "motor_control/motor_control.h"
-#include "scan/scan.h"
+#include "image/image.h"
+#include "laser_control/laser_control.h"
+#include "status/status.h"
 #include "scan_control/scan_control.h"
 
 namespace ui {
@@ -17,6 +18,9 @@ namespace ui {
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
   resize(1400, 900);
+  // Temporary scan defaults until calibration/exposure controls are introduced.
+  scan_configuration_.pixel_size_mm = 0.0001;  // 0.1 micrometres per pixel.
+  scan_configuration_.exposure_time = std::chrono::milliseconds(10);
 
   setStyleSheet(QStringLiteral(R"(
     QMainWindow, QWidget {
@@ -69,14 +73,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       color: #8794a8;
       border-color: #e0e5ec;
     }
-    QLineEdit, QDoubleSpinBox {
+    QLineEdit, QDoubleSpinBox, QSpinBox {
       background: #ffffff;
       border: 1px solid #cfd8e5;
       border-radius: 4px;
       padding: 5px;
       min-height: 20px;
     }
-    QLineEdit:focus, QDoubleSpinBox:focus { border-color: #126bf0; }
+    QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus { border-color: #126bf0; }
     QLineEdit:read-only { background: #f0f4f9; color: #52627c; }
     QDoubleSpinBox:disabled { background: #f3f5f8; color: #8794a8; }
     QScrollArea {
@@ -92,7 +96,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       text-align: center;
     }
     QProgressBar::chunk { background: #126bf0; border-radius: 3px; }
-    QStatusBar { background: #f7f9fc; color: #52627c; }
     QGroupBox#motorControls, QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
       padding: 4px;
       margin-top: 12px;
@@ -125,23 +128,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QGroupBox#axisZ { border-left: 3px solid #126bf0; }
     QGroupBox#axisX { border-left: 3px solid #00a34a; }
     QGroupBox#axisY { border-left: 3px solid #ff7b13; }
-    QPushButton#laserStatus {
-      background: #fff0f1;
-      color: #d9233c;
-      border: 1px solid #ffb8c1;
-      border-radius: 6px;
-      font-size: 20px;
-      font-weight: 600;
-      padding: 12px;
-    }
-    QPushButton#laserStatus[outputOn="true"] {
-      background: #e9f8ef;
-      color: #00843b;
-      border-color: #8bd5ac;
-    }
-    QPushButton#laserStatus:hover { background: #ffe3e7; }
-    QPushButton#laserStatus[outputOn="true"]:hover { background: #d6f1e1; }
-    QPushButton#laserStatus:focus { border: 2px solid #126bf0; padding: 11px; }
   )"));
 
   auto* central_widget = new QWidget(this);
@@ -162,7 +148,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   auto* right_layout = new QVBoxLayout(right_column);
   right_layout->setContentsMargins(0, 0, 0, 0);
   right_layout->setSpacing(12);
-  right_layout->addWidget(CreateScanSection(*this, right_column), 1);
+  auto* upper = new QHBoxLayout();
+  upper->setSpacing(12);
+  upper->addWidget(CreateImageSection(*this, right_column), 3);
+  auto* side = new QVBoxLayout();
+  side->setSpacing(12);
+  side->addWidget(CreateStatusSection(*this, right_column));
+  side->addWidget(CreateLaserControlSection(*this, right_column), 1);
+  upper->addLayout(side, 2);
+  right_layout->addLayout(upper, 1);
   right_layout->addWidget(CreateScanControlSection(*this, right_column));
   layout->addWidget(right_column, 3);
 
@@ -171,12 +165,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 }
 
 void MainWindow::SetBackendAvailable(bool available) {
+  const bool lost_backend = backend_available_ && !available;
   backend_available_ = available;
   emit ManualControlsEnabled(available && !controls_locked_);
   emit ScanInputsEnabled(!controls_locked_);
   emit ScanAvailabilityChanged();
-  statusBar()->showMessage(available ? tr("Hardware not connected.")
-                                    : tr("Application backend is not available."));
+  if (lost_backend) ShowMessage(tr("Application backend is not available."), true);
 }
 
 void MainWindow::SetControlsLocked(bool locked) {
@@ -187,6 +181,8 @@ void MainWindow::SetControlsLocked(bool locked) {
 }
 
 void MainWindow::SetScanImage(const QImage& image) {
+  scan_image_size_ = image.size();
+  start_pixel_set_ = false;
   has_pattern_ = false;
   scan_configuration_.pattern = {};
   if (!image.isNull()) {
@@ -194,6 +190,7 @@ void MainWindow::SetScanImage(const QImage& image) {
     if (result && result->PixelCount() > 0) {
       scan_configuration_.pattern = std::move(*result);
       has_pattern_ = true;
+      ShowMessage(tr("Image imported. Set a start pixel before starting the scan."));
     } else {
       ShowError({{}, "Import image", result ? "The image has no exposed pixels." : result.error()});
     }
@@ -201,22 +198,27 @@ void MainWindow::SetScanImage(const QImage& image) {
   emit ScanAvailabilityChanged();
 }
 
-void MainWindow::SetPixelSize(double micrometres) {
-  scan_configuration_.pixel_size_mm = micrometres / 1000.0;
-}
-
-void MainWindow::SetExposureTime(int milliseconds) {
-  scan_configuration_.exposure_time = std::chrono::milliseconds(milliseconds);
+void MainWindow::SetStartPixel(int x, int y) {
+  if (!CanSetStartPixel()) return;
+  if (x < 0 || y < 0 || x >= scan_image_size_.width() || y >= scan_image_size_.height()) {
+    ShowMessage(tr("Set start: Enter a nonnegative pixel inside the image."), true);
+    return;
+  }
+  scan_configuration_.start_pixel = {x, y};
+  start_pixel_set_ = true;
+  ShowMessage(tr("Start pixel set to (%1, %2).").arg(x).arg(y));
+  emit ScanAvailabilityChanged();
 }
 
 bool MainWindow::CanStartScan() const {
-  return backend_available_ && !controls_locked_ && has_pattern_ &&
+  return backend_available_ && !controls_locked_ && has_pattern_ && start_pixel_set_ &&
+         scan_configuration_.start_pixel.x < scan_configuration_.pattern.Width() &&
+         scan_configuration_.start_pixel.y < scan_configuration_.pattern.Height() &&
          scan_state_.phase == application::ScanPhase::kIdle;
 }
 
 void MainWindow::RequestScan() {
   if (!CanStartScan()) return;
-  scan_configuration_.start_pixel = {0, 0};
   emit StartScanRequested(scan_configuration_);
 }
 
@@ -226,11 +228,15 @@ void MainWindow::UpdateScanState(application::ScanState state) {
   emit ScanAvailabilityChanged();
 }
 
+void MainWindow::ShowMessage(const QString& message, bool error) {
+  emit StatusMessageChanged(message, error);
+}
+
 void MainWindow::ShowError(application::OperationError error) {
   const QString axis = error.axis
       ? tr("Axis %1: ").arg(QStringList{"X", "Y", "Z"}.at(static_cast<int>(*error.axis)))
       : QString();
-  statusBar()->showMessage(axis + QString::fromStdString(error.operation) +
-                          ": " + QString::fromStdString(error.message));
+  ShowMessage(axis + QString::fromStdString(error.operation) +
+              ": " + QString::fromStdString(error.message), true);
 }
 }  // namespace ui

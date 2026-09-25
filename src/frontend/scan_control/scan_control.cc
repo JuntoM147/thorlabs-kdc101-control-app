@@ -1,6 +1,10 @@
 #include "scan_control.h"
 #include <algorithm>
 
+#include <climits>
+#include <QIntValidator>
+#include <QLineEdit>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -18,6 +22,54 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
 
   auto* layout = new QVBoxLayout(section);
   layout->setSpacing(14);
+
+  auto* settings = new QGridLayout();
+  settings->setHorizontalSpacing(16);
+  settings->setVerticalSpacing(6);
+  settings->setColumnStretch(0, 1);
+  settings->setColumnStretch(1, 1);
+  auto* start_x = new QLineEdit(QStringLiteral("0"), section);
+  auto* start_y = new QLineEdit(QStringLiteral("0"), section);
+  start_x->setAccessibleName(QObject::tr("Starting pixel X"));
+  start_y->setAccessibleName(QObject::tr("Starting pixel Y"));
+  auto* x_label = new QLabel(QObject::tr("Starting pixel X"), section);
+  auto* y_label = new QLabel(QObject::tr("Starting pixel Y"), section);
+  x_label->setBuddy(start_x);
+  y_label->setBuddy(start_y);
+  settings->addWidget(x_label, 0, 0);
+  settings->addWidget(y_label, 0, 1);
+  settings->addWidget(start_x, 1, 0);
+  settings->addWidget(start_y, 1, 1);
+  for (auto* field : {start_x, start_y}) {
+    field->setValidator(new QIntValidator(0, INT_MAX, field));
+    field->setAlignment(Qt::AlignRight);
+    field->setToolTip(QObject::tr("Zero-based image coordinate. Click Set start to apply."));
+
+  }
+  auto* set_start = new QPushButton(QObject::tr("Set start"), section);
+  set_start->setAccessibleName(QObject::tr("Set start pixel"));
+  set_start->setToolTip(QObject::tr("Map this image pixel to the current stage position."));
+  settings->addWidget(set_start, 1, 2);
+  layout->addLayout(settings);
+  auto update_start_controls = [&view, start_x, start_y, set_start] {
+    const bool enabled = view.CanSetStartPixel();
+    start_x->setEnabled(enabled);
+    start_y->setEnabled(enabled);
+    set_start->setEnabled(enabled);
+  };
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, update_start_controls);
+  update_start_controls();
+  QObject::connect(set_start, &QPushButton::clicked, section, [&view, start_x, start_y] {
+    bool x_ok = false;
+    bool y_ok = false;
+    const int x = start_x->text().toInt(&x_ok);
+    const int y = start_y->text().toInt(&y_ok);
+    if (!x_ok || !y_ok || !start_x->hasAcceptableInput() || !start_y->hasAcceptableInput()) {
+      view.ShowMessage(QObject::tr("Set start: Enter nonnegative whole numbers for X and Y."), true);
+      return;
+    }
+    view.SetStartPixel(x, y);
+  });
 
   auto* progress = new QProgressBar(section);
   progress->setRange(0, 100);
@@ -39,7 +91,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   start->setIcon(section->style()->standardIcon(QStyle::SP_MediaPlay));
   start->setProperty("primary", true);
   start->setAccessibleName(QObject::tr("Start scan"));
-  start->setToolTip(QObject::tr("Image origin (0, 0) maps to the current stage position."));
+  start->setToolTip(QObject::tr("The applied start pixel maps to the current stage position."));
   start->setEnabled(false);
   start->setMinimumSize(88, 40);
   start->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);

@@ -1,4 +1,4 @@
-#include "scan.h"
+#include "image/image.h"
 
 #include <QFileDialog>
 #include <QFileInfo>
@@ -10,7 +10,6 @@
 #include <QHBoxLayout>
 #include <QStyle>
 
-#include "laser_control/laser_control.h"
 #include <QPushButton>
 #include <QPainter>
 #include <QSizePolicy>
@@ -62,8 +61,10 @@ void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview, QLabel* sta
     preview->clear();
     preview->setText(QObject::tr("No image imported"));
     preview->setToolTip(QString());
-    status->setText(QObject::tr("Could not load %1: %2")
-                        .arg(QFileInfo(path).fileName(), reader.errorString()));
+    const auto message = QObject::tr("Could not load %1: %2")
+        .arg(QFileInfo(path).fileName(), reader.errorString());
+    status->setText(message);
+    view.ShowMessage(message, true);
     return;
   }
 
@@ -81,8 +82,9 @@ void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview, QLabel* sta
 }  // namespace
 
 QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
-  auto* section = new QGroupBox(QObject::tr(" Image"), parent);
+  auto* section = new QGroupBox(QObject::tr("Image"), parent);
 
+  section->setObjectName(QStringLiteral("image"));
   auto* layout = new QVBoxLayout(section);
   auto* import_button = new QPushButton(QObject::tr(" Import"), section);
   import_button->setIcon(section->style()->standardIcon(QStyle::SP_FileIcon));
@@ -123,21 +125,11 @@ QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
     preview->setText(QObject::tr("No image imported"));
     preview->setToolTip(QString());
     status->setText(QObject::tr("No image imported."));
+    view.ShowMessage(QObject::tr("Image cleared."));
   });
 
   QObject::connect(&view, &MainWindow::ScanInputsEnabled, import_button, &QWidget::setEnabled);
   QObject::connect(&view, &MainWindow::ScanInputsEnabled, clear_button, &QWidget::setEnabled);
-  return section;
-}
-
-QWidget* CreateScanSection(MainWindow& view, QWidget* parent) {
-  auto* section = new QGroupBox(QObject::tr("Scan"), parent);
-
-  auto* layout = new QHBoxLayout(section);
-  layout->setSpacing(12);
-  layout->addWidget(CreateImageSection(view, section), 3);
-  layout->addWidget(CreateLaserControlSection(view, section), 2);
-
   return section;
 }
 

@@ -13,8 +13,10 @@ add_library(frontend_ui STATIC
     motor_control/motor_control.h
     motor_information/motor_information.cc
     motor_information/motor_information.h
-    scan/scan.cc
-    scan/scan.h
+    image/image.cc
+    image/image.h
+    status/status.cc
+    status/status.h
     scan_control/scan_control.cc
     scan_control/scan_control.h
     laser_control/laser_control.cc

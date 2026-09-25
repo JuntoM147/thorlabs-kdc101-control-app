@@ -15,15 +15,16 @@ class MainWindow : public QMainWindow {
   explicit MainWindow(QWidget* parent = nullptr);
   void SetBackendAvailable(bool available);
   void SetScanImage(const QImage& image);
-  void SetPixelSize(double micrometres);
-  void SetExposureTime(int milliseconds);
+  void SetStartPixel(int x, int y);
   bool CanStartScan() const;
+  bool CanSetStartPixel() const { return !controls_locked_ && !scan_image_size_.isEmpty(); }
   bool HasBackend() const { return backend_available_; }
   application::ScanPhase ScanPhase() const { return scan_state_.phase; }
 
  public slots:
   void SetControlsLocked(bool locked);
   void UpdateScanState(application::ScanState state);
+  void ShowMessage(const QString& message, bool error = false);
   void ShowError(application::OperationError error);
   void RequestScan();
 
@@ -46,6 +47,7 @@ class MainWindow : public QMainWindow {
   void CancelScanRequested();
 
   // Broadcast application observations to the display sections.
+  void StatusMessageChanged(const QString& message, bool error);
   void AxisStateUpdated(application::AxisState state);
   void LaserStateUpdated(application::LaserState state);
   void ScanDisplayChanged(application::ScanState state);
@@ -57,6 +59,8 @@ class MainWindow : public QMainWindow {
   bool backend_available_ = false;
   bool controls_locked_ = false;
   bool has_pattern_ = false;
+  bool start_pixel_set_ = false;
+  QSize scan_image_size_;
   application::ScanConfiguration scan_configuration_;
   application::ScanState scan_state_;
 };
