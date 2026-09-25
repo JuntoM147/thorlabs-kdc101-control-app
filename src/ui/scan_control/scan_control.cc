@@ -11,6 +11,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSizePolicy>
+#include <QSignalBlocker>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -50,13 +51,39 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   set_start->setAccessibleName(QObject::tr("Set start pixel"));
   set_start->setToolTip(QObject::tr("Map this image pixel to the current stage position."));
   settings->addWidget(set_start, 1, 2);
+  auto* preview_route = new QPushButton(QObject::tr("Preview route"), section);
+  preview_route->setAccessibleName(QObject::tr("Preview route"));
+  preview_route->setCheckable(true);
+  // Reserve both labels' width so toggling cannot redistribute the surrounding layout.
+  preview_route->ensurePolished();
+  const int preview_width = preview_route->sizeHint().width();
+  preview_route->setText(QObject::tr("Hide route"));
+  preview_route->setFixedWidth(std::max(preview_width, preview_route->sizeHint().width()));
+  preview_route->setText(QObject::tr("Preview route"));
+  preview_route->setToolTip(QObject::tr("Show or hide the algorithm route from the applied starting pixel. No hardware is moved."));
+  settings->addWidget(preview_route, 1, 3);
+  auto* reset_route = new QPushButton(QObject::tr("Reset"), section);
+  reset_route->setAccessibleName(QObject::tr("Reset route and start pixel"));
+  reset_route->setToolTip(QObject::tr("Discard the route and applied start pixel, keeping the image."));
+  settings->addWidget(reset_route, 1, 4);
   layout->addLayout(settings);
-  auto update_start_controls = [&view, start_x, start_y, set_start] {
+  auto update_start_controls = [&view, start_x, start_y, set_start, preview_route, reset_route] {
     const bool enabled = view.CanSetStartPixel();
     start_x->setEnabled(enabled);
     start_y->setEnabled(enabled);
     set_start->setEnabled(enabled);
+    preview_route->setEnabled(view.CanPreviewRoute());
+    const QSignalBlocker blocker(preview_route);
+    preview_route->setChecked(view.RoutePreviewVisible());
+    preview_route->setText(view.RoutePreviewVisible() ? QObject::tr("Hide route") : QObject::tr("Preview route"));
+    reset_route->setEnabled(view.CanResetRoute());
   };
+  QObject::connect(preview_route, &QPushButton::toggled, &view, &MainWindow::SetRoutePreviewVisible);
+  QObject::connect(reset_route, &QPushButton::clicked, section, [&view, start_x] {
+    view.ResetRoute();
+    start_x->setFocus();
+    start_x->selectAll();
+  });
   QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, update_start_controls);
   update_start_controls();
   QObject::connect(set_start, &QPushButton::clicked, section, [&view, start_x, start_y] {

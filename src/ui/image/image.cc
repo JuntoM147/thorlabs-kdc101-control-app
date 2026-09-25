@@ -1,4 +1,5 @@
 #include "image/image.h"
+#include "route_preview/route_preview.h"
 
 #include <QFileDialog>
 #include <QFileInfo>
@@ -12,6 +13,7 @@
 
 #include <QPushButton>
 #include <QPainter>
+#include <QTransform>
 #include <QSizePolicy>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -28,6 +30,15 @@ class ImagePreview : public QLabel {
     setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
   }
 
+  // Layout follows the available window space, never the source image dimensions.
+  QSize sizeHint() const override { return QSize(320, 240); }
+  QSize minimumSizeHint() const override { return QSize(180, 180); }
+
+  void SetRoute(const algo::Program& program, algo::PixelPosition start) {
+    route_preview_.SetRoute(program, start);
+    update();
+  }
+
  protected:
   void paintEvent(QPaintEvent* event) override {
     const QPixmap image = pixmap();
@@ -38,10 +49,24 @@ class ImagePreview : public QLabel {
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    const QSize fitted = image.size().scaled(contentsRect().size(), Qt::KeepAspectRatio);
-    const QRect target(contentsRect().center() - QPoint(fitted.width() / 2, fitted.height() / 2), fitted);
+    constexpr int kImagePadding = 12;
+    const QRect available = contentsRect().adjusted(kImagePadding, kImagePadding,
+                                                   -kImagePadding, -kImagePadding);
+    if (available.isEmpty()) return;
+    const QSize fitted = image.size().scaled(available.size(), Qt::KeepAspectRatio);
+    const QRect target(available.topLeft() + QPoint((available.width() - fitted.width()) / 2,
+                                                  (available.height() - fitted.height()) / 2), fitted);
     painter.drawPixmap(target, image);
+    // Allow edge markers to extend into the padding without being cut off.
+    painter.setClipRect(contentsRect());
+    QTransform transform;
+    transform.translate(target.x(), target.y());
+    transform.scale(double(target.width()) / image.width(), double(target.height()) / image.height());
+    route_preview_.Draw(painter, transform);
   }
+
+ private:
+  RoutePreview route_preview_;
 };
 
 void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview, QLabel* status) {
@@ -69,9 +94,6 @@ void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview, QLabel* sta
   }
 
   view.SetScanImage(image);
-  QPixmap pixmap = QPixmap::fromImage(image);
-  pixmap.setDevicePixelRatio(1.0);
-  preview->setPixmap(pixmap);
 
   preview->setToolTip(path);
   status->setText(QObject::tr("%1 (%2 × %3)")
@@ -111,6 +133,23 @@ QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
 
   layout->addLayout(toolbar);
   layout->addWidget(preview, 1);
+
+  QObject::connect(&view, &MainWindow::ScanImageChanged, preview, [preview, status](const QImage& image) {
+    preview->setToolTip(QString());
+    if (image.isNull()) {
+      preview->clear();
+      preview->setText(QObject::tr("No image imported"));
+      status->setText(QObject::tr("No image imported."));
+    } else {
+      QPixmap pixmap = QPixmap::fromImage(image);
+      pixmap.setDevicePixelRatio(1.0);
+      preview->setPixmap(pixmap);
+      status->setText(QObject::tr("Image (%1 × %2)").arg(image.width()).arg(image.height()));
+    }
+  });
+  QObject::connect(&view, &MainWindow::RoutePreviewChanged, preview, [&view, preview] {
+    preview->SetRoute(view.PreviewProgram(), view.StartPixel());
+  });
 
   layout->addWidget(status);
 

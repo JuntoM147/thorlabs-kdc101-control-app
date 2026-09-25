@@ -15,6 +15,8 @@ add_library(frontend_ui STATIC
     motor_information/motor_information.h
     image/image.cc
     image/image.h
+    route_preview/route_preview.cc
+    route_preview/route_preview.h
     status/status.cc
     status/status.h
     scan_control/scan_control.cc
@@ -30,7 +32,7 @@ target_include_directories(frontend_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(frontend_ui
     PUBLIC
-        algo_conversion
+        algo_algorithm
         Qt::Core
         Qt::Widgets
 )

@@ -6,6 +6,8 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <utility>
+#include <exception>
+#include "../../algo/algorithm/algorithm.h"
 
 #include "motor_information/motor_information.h"
 #include "motor_control/motor_control.h"
@@ -212,6 +214,7 @@ void MainWindow::SetControlsLocked(bool locked) {
 }
 
 void MainWindow::SetScanImage(const QImage& image) {
+  preview_program_.clear();
   scan_image_size_ = image.size();
   start_pixel_set_ = false;
   has_pattern_ = false;
@@ -226,6 +229,8 @@ void MainWindow::SetScanImage(const QImage& image) {
       ShowError({{}, "Import image", result ? "The image has no exposed pixels." : result.error()});
     }
   }
+  emit ScanImageChanged(image);
+  emit RoutePreviewChanged();
   emit ScanAvailabilityChanged();
 }
 
@@ -237,8 +242,34 @@ void MainWindow::SetStartPixel(int x, int y) {
   }
   scan_configuration_.start_pixel = {x, y};
   start_pixel_set_ = true;
+  preview_program_.clear();
+  emit RoutePreviewChanged();
   ShowMessage(tr("Start pixel set to (%1, %2).").arg(x).arg(y));
   emit ScanAvailabilityChanged();
+}
+
+void MainWindow::SetRoutePreviewVisible(bool visible) {
+  if (!CanPreviewRoute()) return;
+  preview_program_.clear();
+  if (visible) {
+    try {
+      preview_program_ = algo::GenerateInstructions(scan_configuration_.start_pixel,
+                                                    scan_configuration_.pattern);
+    } catch (const std::exception& error) {
+      ShowError({{}, "Preview route", error.what()});
+    }
+  }
+  emit RoutePreviewChanged();
+  emit ScanAvailabilityChanged();
+}
+
+void MainWindow::ResetRoute() {
+  if (!CanResetRoute()) return;
+  preview_program_.clear();
+  start_pixel_set_ = false;
+  emit RoutePreviewChanged();
+  emit ScanAvailabilityChanged();
+  ShowMessage(tr("Route reset. Choose a starting pixel and click Set start."));
 }
 
 QStringList MainWindow::ScanStartBlockers() const {

@@ -18,6 +18,15 @@ class MainWindow : public QMainWindow {
   void SetBackendAvailable(bool available);
   void SetScanImage(const QImage& image);
   void SetStartPixel(int x, int y);
+  void SetRoutePreviewVisible(bool visible);
+  void ResetRoute();
+  bool CanPreviewRoute() const { return CanResetRoute() && has_pattern_; }
+  bool CanResetRoute() const {
+    return CanSetStartPixel() && start_pixel_set_ && scan_state_.phase == application::ScanPhase::kIdle;
+  }
+  bool RoutePreviewVisible() const { return !preview_program_.empty(); }
+  const algo::Program& PreviewProgram() const { return preview_program_; }
+  algo::PixelPosition StartPixel() const { return scan_configuration_.start_pixel; }
   bool CanStartScan() const;
   QStringList ScanStartBlockers() const;
   bool CanSetStartPixel() const { return !controls_locked_ && !scan_image_size_.isEmpty(); }
@@ -61,6 +70,8 @@ class MainWindow : public QMainWindow {
   void ManualControlsEnabled(bool enabled);
   void ScanInputsEnabled(bool enabled);
   void ScanAvailabilityChanged();
+  void ScanImageChanged(const QImage& image);
+  void RoutePreviewChanged();
 
  private:
   std::array<application::ConnectionState, 3> motor_connections_{};
@@ -73,6 +84,7 @@ class MainWindow : public QMainWindow {
   bool has_pattern_ = false;
   bool start_pixel_set_ = false;
   QSize scan_image_size_;
+  algo::Program preview_program_;
   application::ScanConfiguration scan_configuration_;
   application::ScanState scan_state_;
 };
