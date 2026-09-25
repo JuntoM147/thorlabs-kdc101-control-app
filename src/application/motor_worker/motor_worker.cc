@@ -39,6 +39,21 @@ void MotorWorker::Connect(int id, MotorConnection connection) {
     return;
   }
   motor_ = std::move(*result);
+  const auto observed = motor_->GetStatus();
+  if (!observed || Moving(*observed)) {
+    motor_.reset();
+    emit StateChanged({axis_, ConnectionState::kDisconnected});
+    emit RequestFailed(id, {axis_, "Connect", observed ? "Motor must be idle before applying connection defaults."
+                                                      : observed.error().error_message()});
+    return;
+  }
+  const auto configured = ApplyMotionSettings(DefaultMotorSettings());
+  if (!configured.ok()) {
+    motor_.reset();
+    emit StateChanged({axis_, ConnectionState::kDisconnected});
+    emit RequestFailed(id, {axis_, "Apply connection defaults", configured.error_message()});
+    return;
+  }
   poll_timer_->start(connection.polling_interval_ms);
   PollDevice();
   if (motor_) emit RequestCompleted(id);
@@ -102,6 +117,12 @@ void MotorWorker::ConfigureMotion(int id, MotorSettings settings) {
     emit RequestFailed(id, {axis_, "Configure motion", observed ? "Motor is already moving."
                                                              : observed.error().error_message()}); return;
   }
+  const auto result = ApplyMotionSettings(settings);
+  if (!result.ok()) emit RequestFailed(id, {axis_, "Configure motion", result.error_message()});
+  else emit RequestCompleted(id);
+}
+
+thorlabs::DeviceStatus MotorWorker::ApplyMotionSettings(const MotorSettings& settings) {
   // Updates are ordered, not transactional; report the first failure and never start motion.
   auto result = motor_->SetMoveVelocity({settings.move.speed_mm_per_second,
                                           settings.move.acceleration_mm_per_second_squared});
@@ -115,9 +136,9 @@ void MotorWorker::ConfigureMotion(int id, MotorSettings settings) {
                                    ? thorlabs::JogMode::kSingleStep : thorlabs::JogMode::kContinuous,
                                settings.jog_stop_mode == StopMode::kProfiled
                                    ? thorlabs::StopMode::kProfiled : thorlabs::StopMode::kImmediate);
-  if (!result.ok()) emit RequestFailed(id, {axis_, "Configure motion", result.error_message()});
-  else emit RequestCompleted(id);
+  return result;
 }
+
 void MotorWorker::Home(int id) {
   BeginMotion(id, OperationState::kHoming, [this] { return motor_->StartHome(); });
 }

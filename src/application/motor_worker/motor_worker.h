@@ -49,6 +49,7 @@ class MotorWorker : public QObject {
   void BeginMotion(int id, OperationState operation,
                    const std::function<thorlabs::DeviceStatus()>& start);
   void FailDevice(OperationError error);
+  thorlabs::DeviceStatus ApplyMotionSettings(const MotorSettings& settings);
   OperationState operation_ = OperationState::kIdle;  // Current command, not feedback.
   const Axis axis_;
   std::shared_ptr<const thorlabs::KinesisSimulation> simulation_;

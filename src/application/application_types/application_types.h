@@ -48,6 +48,21 @@ struct MotorSettings {
   StopMode jog_stop_mode = StopMode::kProfiled;
 };
 
+// Applied on every connection, after loading the stage's Kinesis profile.
+inline constexpr double kDefaultJogStepMm = 0.005;
+inline constexpr double kDefaultSpeedMmPerSecond = 0.08;
+inline constexpr double kDefaultAccelerationMmPerSecondSquared = 1.5;
+inline MotorSettings DefaultMotorSettings() {
+  MotorSettings settings;
+  settings.move = {kDefaultSpeedMmPerSecond, kDefaultAccelerationMmPerSecondSquared};
+  settings.jog = settings.move;
+  settings.homing_speed_mm_per_second = kDefaultSpeedMmPerSecond;
+  settings.jog_step_mm = kDefaultJogStepMm;
+  settings.jog_mode = JogMode::kSingleStep;
+  settings.jog_stop_mode = StopMode::kProfiled;
+  return settings;
+}
+
 struct ScanConfiguration {
   algo::BinaryMatrix pattern;
   // Pixel mapped to the current physical X/Y position.

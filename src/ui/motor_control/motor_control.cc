@@ -157,7 +157,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
 
   auto* step_size = new QComboBox(section);
   step_size->setEditable(true);
-  step_size->addItems({QStringLiteral("0.005"), QStringLiteral("0.1"), QStringLiteral("1.0")});
+  step_size->addItems({QString::number(application::kDefaultJogStepMm), QStringLiteral("0.1"), QStringLiteral("1.0")});
   step_size->setInsertPolicy(QComboBox::NoInsert);
 
   auto* validator = new QDoubleValidator(0.000001, 1000000.0, 6, step_size);
@@ -195,7 +195,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
     emit view.ConfigureAxisRequested(axis_id, settings);
   });
   add_field_label(QObject::tr("Speed"), 4);
-  auto* speed = new QLineEdit(QStringLiteral("0.08"), section);
+  auto* speed = new QLineEdit(QString::number(application::kDefaultSpeedMmPerSecond), section);
   auto* speed_validator = new QDoubleValidator(0.000001, 1000000.0, 6, speed);
   speed_validator->setNotation(QDoubleValidator::StandardNotation);
   speed_validator->setLocale(QLocale::c());
@@ -279,6 +279,11 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   });
   QObject::connect(&view, &MainWindow::AxisStateUpdated, section, [=](application::AxisState state) {
     if (state.axis != axis_id) return;
+    if (state.connection == application::ConnectionState::kConnected &&
+        availability->state.connection != application::ConnectionState::kConnected) {
+      step_size->setCurrentText(QString::number(application::kDefaultJogStepMm));
+      speed->setText(QString::number(application::kDefaultSpeedMmPerSecond));
+    }
     availability->state = state;
     refresh();
     const bool connected = state.connection == application::ConnectionState::kConnected;
