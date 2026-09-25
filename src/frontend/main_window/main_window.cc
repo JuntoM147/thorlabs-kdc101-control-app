@@ -93,9 +93,38 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     }
     QProgressBar::chunk { background: #126bf0; border-radius: 3px; }
     QStatusBar { background: #f7f9fc; color: #52627c; }
-    QGroupBox#axisZ { border-left: 5px solid #126bf0; }
-    QGroupBox#axisX { border-left: 5px solid #00a34a; }
-    QGroupBox#axisY { border-left: 5px solid #ff7b13; }
+    QGroupBox#motorControls, QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
+      padding: 4px;
+      margin-top: 12px;
+    }
+    QLabel#axisFieldLabel { color: #52627c; font-size: 12px; }
+    QGroupBox#motorControls QPushButton { padding: 3px 8px; }
+    QGroupBox#motorControls QPushButton:focus { padding: 2px 7px; }
+    QGroupBox#motorControls QLineEdit, QGroupBox#motorControls QDoubleSpinBox {
+      padding: 2px 5px;
+    }
+    QGroupBox#motorControls QLineEdit:disabled, QGroupBox#motorControls QComboBox:disabled {
+      background: #f3f5f8;
+      color: #8794a8;
+    }
+    QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
+      font-size: 13px;
+    }
+    QGroupBox#motorControls QPushButton#axisStop {
+      color: #b42338;
+      border-color: #d9919b;
+      background: #ffffff;
+    }
+    QGroupBox#motorControls QPushButton#axisStop:hover { background: #fff0f1; }
+    QGroupBox#motorControls QPushButton#axisStop:pressed { background: #ffe0e4; }
+    QGroupBox#motorControls QPushButton#axisStop:disabled {
+      background: #edf0f4;
+      color: #8794a8;
+      border-color: #e0e5ec;
+    }
+    QGroupBox#axisZ { border-left: 3px solid #126bf0; }
+    QGroupBox#axisX { border-left: 3px solid #00a34a; }
+    QGroupBox#axisY { border-left: 3px solid #ff7b13; }
     QPushButton#laserStatus {
       background: #fff0f1;
       color: #d9233c;
