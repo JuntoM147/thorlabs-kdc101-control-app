@@ -76,6 +76,7 @@ class Application : public QObject {
   int next_request_id_ = 1;
   
   void TryStartScan();
+  int BeginManualRequest(std::optional<Axis> axis, bool continuous_drive = false);
 
   std::array<std::unique_ptr<MotorController>, 3> motors_;
   std::unique_ptr<LaserController> laser_;

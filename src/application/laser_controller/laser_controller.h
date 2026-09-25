@@ -53,6 +53,7 @@ class LaserController : public QObject {
   [[nodiscard]] int NextScanRequestId();
   void EnsureWorkerStarted();
   void StopWorkerAndWait();
+  std::optional<int> disconnect_request_;
 
   int next_scan_request_id_ = -1;
   std::optional<int> scan_request_;

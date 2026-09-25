@@ -2,6 +2,7 @@
 #define APPLICATION_MOTOR_WORKER_H_
 
 #include <memory>
+#include <functional>
 #include <optional>
 
 #include <QObject>
@@ -43,6 +44,10 @@ class MotorWorker : public QObject {
   void PollDevice();
 
  private:
+  void BeginMotion(int id, OperationState operation,
+                   const std::function<thorlabs::DeviceStatus()>& start);
+  void FailDevice(OperationError error);
+  OperationState operation_ = OperationState::kIdle;  // Current command, not feedback.
   const Axis axis_;
   std::unique_ptr<thorlabs::KDC101> motor_; // owns the RAII motor wrapper
   QTimer* poll_timer_ = nullptr;

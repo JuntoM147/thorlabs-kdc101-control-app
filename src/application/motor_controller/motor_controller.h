@@ -2,6 +2,7 @@
 #define APPLICATION_MOTOR_CONTROLLER_H_
 
 #include <optional>
+#include <functional>
 
 #include <QObject>
 #include <QPointer>
@@ -63,6 +64,10 @@ class MotorController : public QObject {
   [[nodiscard]] int NextScanRequestId();
   void EnsureWorkerStarted();
   void StopWorkerAndWait();
+  void Dispatch(int id, const std::function<void(MotorWorker&)>& command);
+  void FinishScanRequest();
+  std::optional<int> disconnect_request_;
+  bool scan_cancelled_ = false;
 
   const Axis axis_;
   int next_scan_request_id_ = -1;

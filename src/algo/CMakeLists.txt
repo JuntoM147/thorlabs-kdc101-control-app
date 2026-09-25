@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(confo_quanta_algo LANGUAGES CXX)
+    message(FATAL_ERROR "Open the repository-root CMakeLists.txt to build the complete application.")
 endif()
-
-find_package(Qt6 6.5 REQUIRED COMPONENTS Gui)
 
 add_library(algo_conversion STATIC convert/conversion.cc convert/conversion.h)
 target_compile_features(algo_conversion PUBLIC cxx_std_23)
@@ -14,7 +12,6 @@ target_link_libraries(algo_conversion PUBLIC Qt6::Gui)
 add_library(algo_algorithm STATIC algorithm/algorithm.cc algorithm/algorithm.h instructions/instructions.h)
 target_link_libraries(algo_algorithm PUBLIC algo_conversion)
 
-include(CTest)
 if(BUILD_TESTING)
     add_executable(conversion_test ../../tests/algo/conversion_test.cc)
     target_link_libraries(conversion_test PRIVATE algo_conversion)

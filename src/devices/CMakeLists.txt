@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.19)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    project(devices LANGUAGES CXX)
+    message(FATAL_ERROR "Open the repository-root CMakeLists.txt to build the complete application.")
 endif()
 
 option(DEVICES_USE_FAKE_KINESIS "Build motor wrappers against the test SDK" OFF)
-option(DEVICES_BUILD_NI_DAQ "Build the NI-DAQmx laser wrapper" ON)
+option(DEVICES_USE_FAKE_NI_DAQ "Build laser wrapper against the test SDK" OFF)
 
 add_library(device_status STATIC
     device_status/device_status.cc
@@ -33,7 +33,10 @@ else()
     target_link_libraries(kinesis_devices PUBLIC "${KINESIS_LIBRARY}")
 endif()
 
-if(DEVICES_BUILD_NI_DAQ)
+if(DEVICES_USE_FAKE_NI_DAQ)
+    set(NIDAQMX_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../tests/ni_daq_laser/fake_sdk")
+    set(NIDAQMX_LIBRARY "")
+else()
     set(NIDAQMX_ROOT "C:/Program Files (x86)/National Instruments/Shared/ExternalCompilerSupport/C"
         CACHE PATH "NI-DAQmx C development support directory")
     find_path(NIDAQMX_INCLUDE_DIR NIDAQmx.h HINTS "${NIDAQMX_ROOT}/include" REQUIRED)
@@ -43,12 +46,12 @@ if(DEVICES_BUILD_NI_DAQ)
         set(_ni_library_dir "${NIDAQMX_ROOT}/lib32/msvc")
     endif()
     find_library(NIDAQMX_LIBRARY NIDAQmx HINTS "${_ni_library_dir}" REQUIRED)
-
-    add_library(ni_daq_laser STATIC
-        ni_daq_laser/ni_daq_laser.cc
-        ni_daq_laser/ni_daq_laser.h
-    )
-    target_compile_features(ni_daq_laser PUBLIC cxx_std_23)
-    target_include_directories(ni_daq_laser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${NIDAQMX_INCLUDE_DIR}")
-    target_link_libraries(ni_daq_laser PUBLIC device_status "${NIDAQMX_LIBRARY}")
 endif()
+
+add_library(ni_daq_laser STATIC
+    ni_daq_laser/ni_daq_laser.cc
+    ni_daq_laser/ni_daq_laser.h
+)
+target_compile_features(ni_daq_laser PUBLIC cxx_std_23)
+target_include_directories(ni_daq_laser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${NIDAQMX_INCLUDE_DIR}")
+target_link_libraries(ni_daq_laser PUBLIC device_status "${NIDAQMX_LIBRARY}")

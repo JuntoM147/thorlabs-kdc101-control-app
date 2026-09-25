@@ -63,6 +63,9 @@ class ScanController : public QObject {
   void StopMotorsAndTurnOutputOff();
   void FinishScan();
   void FailScan(OperationError error);
+  void ContinueStopAndOff();
+  void AwaitDevice(Device device);
+  bool cleanup_started_ = false;  // Distinguishes draining an instruction from cleanup.
 
   // Borrowed devices, Application owns their lifetime
   std::array<std::reference_wrapper<MotorController>, 3> motors_;
