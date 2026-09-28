@@ -2,6 +2,7 @@
 #include "main_window/display_text.h"
 
 #include <initializer_list>
+#include <array>
 #include <memory>
 
 #include <QGridLayout>
@@ -24,6 +25,7 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
   layout->setColumnStretch(4, 2);
   layout->setColumnStretch(5, 1);
 
+  constexpr std::array<int, 3> default_serial_numbers{27267150, 27266365, 27266180};
   int row = 0;
   for (const auto& axis : {QStringLiteral("X"), QStringLiteral("Y"), QStringLiteral("Z")}) {
     layout->addWidget(new QLabel(QObject::tr("Axis %1").arg(axis), section), row, 0);
@@ -40,7 +42,7 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
     auto* connection_status = new QLabel(QObject::tr("Disconnected"), section);
     layout->addWidget(connection_status, row, 2);
 
-    auto* serial_number = new QLineEdit(QString::number(27000001 + row), section);
+    auto* serial_number = new QLineEdit(QString::number(default_serial_numbers[row]), section);
     serial_number->setPlaceholderText(QObject::tr("Serial number"));
     serial_number->setAccessibleName(QObject::tr("%1 axis serial number").arg(axis));
     serial_number->setMinimumWidth(100);
