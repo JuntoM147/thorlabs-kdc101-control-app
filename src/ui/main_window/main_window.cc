@@ -1,6 +1,5 @@
 #include "main_window/main_window.h"
 
-#include <QHBoxLayout>
 #include <QTabWidget>
 #include <QStringList>
 #include <QWidget>
@@ -9,19 +8,19 @@
 #include <exception>
 #include "../../algo/algorithm/algorithm.h"
 
-#include "motor_information/motor_information.h"
-#include "motor_control/motor_control.h"
-#include "image/image.h"
-#include "laser_control/laser_control.h"
-#include "status/status.h"
-#include "scan_control/scan_control.h"
-#include "options/options.h"
+#include "motor_tab/motor_information/motor_information.h"
+#include "motor_tab/motor_control/motor_control.h"
+#include "scan_tab/image/image.h"
+#include "laser_tab/laser_control/laser_control.h"
+#include "shared/status/status.h"
+#include "scan_tab/scan_control/scan_control.h"
+#include "options_tab/options/options.h"
 
 namespace ui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
-  resize(1200, 640);
+  setFixedSize(720, 840);
   // Temporary scan defaults until calibration/exposure controls are introduced.
   scan_configuration_.pixel_size_mm = 0.0001;  // 0.1 micrometres per pixel.
   scan_configuration_.exposure_time = std::chrono::milliseconds(10);
@@ -31,7 +30,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       background: #f7f9fc;
       color: #14233f;
       font-family: "Segoe UI";
-      font-size: 12px;
+      font-size: 14px;
     }
     QGroupBox {
       background: #ffffff;
@@ -39,7 +38,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       border-radius: 8px;
       margin-top: 12px;
       padding: 6px 8px 4px;
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 600;
     }
     QGroupBox::title {
@@ -104,7 +103,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       padding: 2px 4px;
       margin-top: 12px;
     }
-    QLabel#axisFieldLabel { color: #52627c; font-size: 12px; }
+    QLabel#axisFieldLabel { color: #52627c; font-size: 14px; }
     QGroupBox#motorControls QPushButton { padding: 2px 8px; }
     QGroupBox#motorControls QPushButton:focus { padding: 1px 7px; }
     QGroupBox#motorControls QLineEdit, QGroupBox#motorControls QDoubleSpinBox {
@@ -115,7 +114,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       color: #8794a8;
     }
     QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
-      font-size: 12px;
+      font-size: 14px;
     }
     QGroupBox#motorControls QPushButton#axisStop {
       color: #b42338;
@@ -134,35 +133,34 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     QGroupBox#axisY { border-left: 3px solid #ff7b13; }
   )"));
 
-  auto* central_widget = new QWidget(this);
+  auto* tabs = new QTabWidget(this);
+  const auto add_page = [this, tabs](const QString& title) {
+    auto* page = new QWidget(tabs);
+    auto* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(12, 6, 12, 6);
+    layout->setSpacing(6);
+    layout->addWidget(CreateStatusSection(*this, page));
+    tabs->addTab(page, title);
+    return layout;
+  };
 
-  auto* layout = new QHBoxLayout(central_widget);
-  layout->setContentsMargins(12, 6, 12, 6);
-  layout->setSpacing(12);
+  auto* motor_layout = add_page(tr("Motor"));
+  auto* motor_page = motor_layout->parentWidget();
+  motor_layout->addWidget(CreateMotorControlSection(*this, motor_page), 1);
+  motor_layout->addWidget(CreateMotorInformationSection(*this, motor_page));
 
-  auto* left_column = new QWidget(central_widget);
-  auto* left_layout = new QVBoxLayout(left_column);
-  left_layout->setContentsMargins(0, 0, 0, 0);
-  left_layout->setSpacing(6);
-  left_layout->addWidget(CreateMotorControlSection(*this, left_column), 1);
-  left_layout->addWidget(CreateMotorInformationSection(*this, left_column));
-  layout->addWidget(left_column, 2);
+  auto* scan_layout = add_page(tr("Scan"));
+  auto* scan_page = scan_layout->parentWidget();
+  scan_layout->addWidget(CreateImageSection(*this, scan_page), 1);
+  scan_layout->addWidget(CreateScanControlSection(*this, scan_page));
 
-  auto* right_column = new QWidget(central_widget);
-  auto* right_layout = new QVBoxLayout(right_column);
-  right_layout->setContentsMargins(0, 0, 0, 0);
-  right_layout->setSpacing(6);
-  auto* upper = new QHBoxLayout();
-  upper->setSpacing(12);
-  upper->addWidget(CreateImageSection(*this, right_column), 3);
-  auto* side = new QVBoxLayout();
-  side->setSpacing(6);
-  side->addWidget(CreateStatusSection(*this, right_column));
-  side->addWidget(CreateLaserControlSection(*this, right_column), 1);
-  upper->addLayout(side, 2);
-  right_layout->addLayout(upper, 1);
-  right_layout->addWidget(CreateScanControlSection(*this, right_column));
-  layout->addWidget(right_column, 3);
+  auto* laser_layout = add_page(tr("Laser"));
+  laser_layout->addWidget(CreateLaserControlSection(*this, laser_layout->parentWidget()));
+  laser_layout->addStretch();
+
+  auto* options_layout = add_page(tr("Options"));
+  options_layout->addWidget(CreateOptionsSection(*this, options_layout->parentWidget()), 1);
+  ConnectStatusMessages(*this);
 
   connect(this, &MainWindow::AxisStateUpdated, this, [this](application::AxisState state) {
     const auto index = static_cast<std::size_t>(state.axis);
@@ -180,9 +178,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     laser_output_ = state.output_enabled;
     emit ScanAvailabilityChanged();
   });
-  auto* tabs = new QTabWidget(this);
-  tabs->addTab(central_widget, tr("Control"));
-  tabs->addTab(CreateOptionsSection(*this, tabs), tr("Options"));
   setCentralWidget(tabs);
   SetBackendAvailable(false);
 }

@@ -6,7 +6,7 @@
 #include <QPainterPath>
 #include <QPointF>
 
-#include "../../algo/instructions/instructions.h"
+#include "../../../algo/instructions/instructions.h"
 
 class QPainter;
 class QTransform;

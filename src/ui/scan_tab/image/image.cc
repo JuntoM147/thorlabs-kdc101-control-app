@@ -1,5 +1,5 @@
-#include "image/image.h"
-#include "route_preview/route_preview.h"
+#include "scan_tab/image/image.h"
+#include "scan_tab/route_preview/route_preview.h"
 
 #include <QFileDialog>
 #include <QFileInfo>
@@ -104,7 +104,7 @@ void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview, QLabel* sta
 }  // namespace
 
 QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
-  auto* section = new QGroupBox(QObject::tr("Image"), parent);
+  auto* section = new QGroupBox(QObject::tr("Scan preview"), parent);
 
   section->setObjectName(QStringLiteral("image"));
   auto* layout = new QVBoxLayout(section);

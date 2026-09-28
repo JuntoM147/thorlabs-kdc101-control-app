@@ -6,6 +6,8 @@
 
 namespace ui {
 QWidget* CreateStatusSection(MainWindow& view, QWidget* parent);
+// Connect once per window; every status section displays the same messages.
+void ConnectStatusMessages(MainWindow& view);
 }  // namespace ui
 
 #endif  // FRONTEND_STATUS_H_

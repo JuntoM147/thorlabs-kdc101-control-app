@@ -1,5 +1,5 @@
 #include "laser_control.h"
-#include "main_window/display_text.h"
+#include "shared/display_text.h"
 #include <QLineEdit>
 #include <QCheckBox>
 #include <QPainter>

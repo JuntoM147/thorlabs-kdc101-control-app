@@ -8,23 +8,23 @@ add_library(frontend_ui STATIC
     main_window/main_window.cc
     main_window/main_window.h
     main_window/application_binding.h
-    main_window/display_text.h
-    motor_control/motor_control.cc
-    motor_control/motor_control.h
-    motor_information/motor_information.cc
-    motor_information/motor_information.h
-    image/image.cc
-    image/image.h
-    route_preview/route_preview.cc
-    route_preview/route_preview.h
-    status/status.cc
-    status/status.h
-    scan_control/scan_control.cc
-    scan_control/scan_control.h
-    laser_control/laser_control.cc
-    laser_control/laser_control.h
-    options/options.cc
-    options/options.h
+    shared/display_text.h
+    motor_tab/motor_control/motor_control.cc
+    motor_tab/motor_control/motor_control.h
+    motor_tab/motor_information/motor_information.cc
+    motor_tab/motor_information/motor_information.h
+    scan_tab/image/image.cc
+    scan_tab/image/image.h
+    scan_tab/route_preview/route_preview.cc
+    scan_tab/route_preview/route_preview.h
+    shared/status/status.cc
+    shared/status/status.h
+    scan_tab/scan_control/scan_control.cc
+    scan_tab/scan_control/scan_control.h
+    laser_tab/laser_control/laser_control.cc
+    laser_tab/laser_control/laser_control.h
+    options_tab/options/options.cc
+    options_tab/options/options.h
 )
 
 target_compile_features(frontend_ui PUBLIC cxx_std_23)

@@ -18,7 +18,7 @@ QWidget* CreateOptionsSection(MainWindow& view, QWidget* parent) {
   auto* layout = new QGridLayout(page);
   layout->setContentsMargins(16, 16, 16, 16);
   layout->setSpacing(16);
-  for (int column = 0; column < 3; ++column) layout->setColumnStretch(column, 1);
+  layout->setColumnStretch(0, 1);
   layout->setRowStretch(2, 1);
 
   auto* offset_group = new QGroupBox(QObject::tr("Offset"), page);

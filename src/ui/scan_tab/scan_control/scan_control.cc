@@ -50,7 +50,9 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   auto* set_start = new QPushButton(QObject::tr("Set start"), section);
   set_start->setAccessibleName(QObject::tr("Set start pixel"));
   set_start->setToolTip(QObject::tr("Map this image pixel to the current stage position."));
-  settings->addWidget(set_start, 1, 2);
+  auto* route_buttons = new QHBoxLayout();
+  route_buttons->setSpacing(8);
+  route_buttons->addWidget(set_start);
   auto* preview_route = new QPushButton(QObject::tr("Preview route"), section);
   preview_route->setAccessibleName(QObject::tr("Preview route"));
   preview_route->setCheckable(true);
@@ -61,12 +63,13 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   preview_route->setFixedWidth(std::max(preview_width, preview_route->sizeHint().width()));
   preview_route->setText(QObject::tr("Preview route"));
   preview_route->setToolTip(QObject::tr("Show or hide the algorithm route from the applied starting pixel. No hardware is moved."));
-  settings->addWidget(preview_route, 1, 3);
+  route_buttons->addWidget(preview_route);
   auto* reset_route = new QPushButton(QObject::tr("Reset"), section);
   reset_route->setAccessibleName(QObject::tr("Reset route and start pixel"));
   reset_route->setToolTip(QObject::tr("Discard the route and applied start pixel, keeping the image."));
-  settings->addWidget(reset_route, 1, 4);
+  route_buttons->addWidget(reset_route);
   layout->addLayout(settings);
+  layout->addLayout(route_buttons);
   auto update_start_controls = [&view, start_x, start_y, set_start, preview_route, reset_route] {
     const bool enabled = view.CanSetStartPixel();
     start_x->setEnabled(enabled);

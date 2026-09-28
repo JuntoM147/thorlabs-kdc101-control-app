@@ -1,5 +1,5 @@
 #include "status.h"
-#include "main_window/display_text.h"
+#include "shared/display_text.h"
 
 #include <array>
 #include <QGroupBox>
@@ -18,7 +18,7 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
   message->setWordWrap(true);
   message->setTextFormat(Qt::PlainText);
   message->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  message->setMinimumHeight(48);
+  message->setMinimumHeight(24);
   layout->addWidget(message);
   QObject::connect(&view, &MainWindow::StatusMessageChanged, section,
                    [message](const QString& text, bool error) {
@@ -27,7 +27,11 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
     message->setStyleSheet(error ? "color: #b42338;" : "color: #00843b;");
   });
 
-  QObject::connect(&view, &MainWindow::AxisSettingsApplied, section,
+  return section;
+}
+
+void ConnectStatusMessages(MainWindow& view) {
+  QObject::connect(&view, &MainWindow::AxisSettingsApplied, &view,
       [&view](application::Axis axis, application::MotorSettings settings) {
     const auto index = static_cast<int>(axis);
     if (index < 0 || index >= 3) return;
@@ -41,7 +45,7 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
   });
 
   // Only state transitions produce messages; position polling must not erase errors.
-  QObject::connect(&view, &MainWindow::AxisStateUpdated, section,
+  QObject::connect(&view, &MainWindow::AxisStateUpdated, &view,
       [&view, previous = std::array<application::AxisState, 3>{}]
       (application::AxisState state) mutable {
     const auto index = static_cast<std::size_t>(state.axis);
@@ -57,7 +61,7 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
       view.ShowMessage(prefix + OperationText(state.operation));
     }
   });
-  QObject::connect(&view, &MainWindow::LaserStateUpdated, section,
+  QObject::connect(&view, &MainWindow::LaserStateUpdated, &view,
       [&view, previous = application::LaserState{}](application::LaserState state) mutable {
     const auto old = previous;
     previous = state;
@@ -70,7 +74,7 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
                                             : QObject::tr("Laser output disabled."));
     }
   });
-  QObject::connect(&view, &MainWindow::ScanDisplayChanged, section,
+  QObject::connect(&view, &MainWindow::ScanDisplayChanged, &view,
       [&view, previous = application::ScanPhase::kIdle](application::ScanState state) mutable {
     if (state.phase == previous) return;
     previous = state.phase;
@@ -90,7 +94,6 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
     }
     view.ShowMessage(text, state.phase == ScanPhase::kFailed);
   });
-  return section;
 }
 
 }  // namespace ui

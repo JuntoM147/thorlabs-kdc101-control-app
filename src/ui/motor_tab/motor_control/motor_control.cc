@@ -1,5 +1,5 @@
 #include "motor_control.h"
-#include "main_window/display_text.h"
+#include "shared/display_text.h"
 
 #include <initializer_list>
 #include <memory>
@@ -24,7 +24,7 @@ namespace {
 QPushButton* CreateCommandButton(const QString& text, QWidget* parent) {
   auto* button = new QPushButton(text, parent);
   button->setMinimumWidth(88);
-  button->setFixedHeight(24);
+  button->setFixedHeight(28);
   button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   button->setEnabled(false);
   button->setToolTip(QObject::tr("Motor is not connected."));
@@ -49,7 +49,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   header->addWidget(indicator);
   auto* status = new QLabel(QObject::tr("Disconnected"), section);
   status->setAccessibleName(QObject::tr("%1 axis connection status").arg(axis));
-  status->setStyleSheet("color: #52627c; font-size: 12px;");
+  status->setStyleSheet("color: #52627c; font-size: 14px;");
   header->addWidget(status);
   layout->addLayout(header);
 
@@ -63,7 +63,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   position_label->setObjectName(QStringLiteral("axisFieldLabel"));
   manual->addWidget(position_label);
   auto* readout_widget = new QWidget(section);
-  readout_widget->setFixedHeight(24);
+  readout_widget->setFixedHeight(28);
   readout_widget->setObjectName(QStringLiteral("axisReadout"));
   readout_widget->setStyleSheet("QWidget#axisReadout { background: transparent; }");
   auto* readout = new QHBoxLayout(readout_widget);
@@ -71,7 +71,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   readout->setSpacing(6);
   auto* position = new QLabel(QStringLiteral("--"), section);
   position->setAccessibleName(QObject::tr("%1 axis current position").arg(axis));
-  position->setStyleSheet("font-size: 21px; font-weight: 600;");
+  position->setStyleSheet("font-size: 24px; font-weight: 600;");
   position->setToolTip(QObject::tr("Position is unavailable until the motor is connected."));
   readout->addWidget(position);
   readout->addWidget(new QLabel(QObject::tr("mm"), section), 0, Qt::AlignBottom);
@@ -140,7 +140,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   absolute_position->setRange(-1000000.0, 1000000.0);
   absolute_position->setButtonSymbols(QAbstractSpinBox::NoButtons);
   absolute_position->setMinimumWidth(84);
-  absolute_position->setFixedHeight(24);
+  absolute_position->setFixedHeight(28);
   absolute_position->setAlignment(Qt::AlignRight);
   absolute_position->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   absolute_position->setEnabled(false);
@@ -165,7 +165,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   validator->setLocale(QLocale::c());
   step_size->setValidator(validator);
   step_size->setMinimumWidth(84);
-  step_size->setFixedHeight(24);
+  step_size->setFixedHeight(28);
   step_size->lineEdit()->setAlignment(Qt::AlignRight);
   step_size->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   step_size->setAccessibleName(QObject::tr("%1 axis jog step size in mm").arg(axis));
@@ -201,7 +201,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   speed_validator->setLocale(QLocale::c());
   speed->setValidator(speed_validator);
   speed->setMinimumWidth(84);
-  speed->setFixedHeight(24);
+  speed->setFixedHeight(28);
   speed->setAlignment(Qt::AlignRight);
   speed->setEnabled(false);
   speed->setAccessibleName(QObject::tr("%1 axis speed in mm per second").arg(axis));

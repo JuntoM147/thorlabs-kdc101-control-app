@@ -1,5 +1,5 @@
 #include "motor_information.h"
-#include "main_window/display_text.h"
+#include "shared/display_text.h"
 
 #include <initializer_list>
 #include <array>

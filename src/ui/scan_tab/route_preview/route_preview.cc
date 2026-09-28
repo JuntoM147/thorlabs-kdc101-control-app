@@ -1,4 +1,4 @@
-#include "route_preview/route_preview.h"
+#include "scan_tab/route_preview/route_preview.h"
 
 #include <QColor>
 #include <QPainter>
