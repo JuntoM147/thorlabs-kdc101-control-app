@@ -149,6 +149,16 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   });
   manual->setEnabled(false);
   QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual, &QWidget::setEnabled);
+
+  auto* pixel_size_label = new QLabel(QObject::tr("Pixel size (µm/pixel)"), section);
+  auto* pixel_size = new QLineEdit(section);
+  pixel_size->setAccessibleName(QObject::tr("Pixel size in micrometres per pixel"));
+  pixel_size->setAlignment(Qt::AlignRight);
+  pixel_size->setToolTip(QObject::tr("Not applied to scans yet."));
+  pixel_size_label->setBuddy(pixel_size);
+  // UI placeholder only; intentionally not connected to scan configuration.
+  outer_layout->addWidget(pixel_size_label);
+  outer_layout->addWidget(pixel_size);
   outer_layout->addStretch();
 
   return section;
