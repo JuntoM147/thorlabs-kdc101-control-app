@@ -4,6 +4,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     message(FATAL_ERROR "Open the repository-root CMakeLists.txt to build the complete application.")
 endif()
 
+option(APPLICATION_USE_KINESIS_SIMULATION "Use the Kinesis simulator in the application" ON)
+
 add_library(application STATIC
     application/application.cc application/application.h
     application_types/application_types.h
@@ -13,6 +15,8 @@ add_library(application STATIC
     laser_worker/laser_worker.cc laser_worker/laser_worker.h
     scan_controller/scan_controller.cc scan_controller/scan_controller.h)
 set_target_properties(application PROPERTIES AUTOMOC ON)
+target_compile_definitions(application PRIVATE
+    APPLICATION_USE_KINESIS_SIMULATION=$<BOOL:${APPLICATION_USE_KINESIS_SIMULATION}>)
 target_compile_features(application PUBLIC cxx_std_23)
 target_include_directories(application PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(application PUBLIC Qt6::Core algo_algorithm kinesis_devices ni_daq_laser)

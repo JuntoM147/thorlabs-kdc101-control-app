@@ -5,8 +5,8 @@
 
 namespace application {
 namespace {
-// Set to false to use physical Kinesis devices instead of the Kinesis simulator.
-constexpr bool kUseKinesisSimulation = true;
+// Selected per build directory; the app preset uses physical Kinesis devices.
+constexpr bool kUseKinesisSimulation = APPLICATION_USE_KINESIS_SIMULATION != 0;
 }  // namespace
 
 Application::Application(QObject* parent) : QObject(parent) {
