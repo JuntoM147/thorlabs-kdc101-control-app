@@ -35,7 +35,7 @@ void MotorWorker::Connect(int id, MotorConnection connection) {
   auto result = thorlabs::KDC101::CreateMotor(connection.serial_number, connection.polling_interval_ms, simulation_);
   if (!result) {
     emit StateChanged({axis_, ConnectionState::kDisconnected});
-    emit RequestFailed(id, {axis_, "Connect", result.error().error_message()});
+    emit RequestFailed(id, {axis_, "Connect " + connection.serial_number, result.error().error_message()});
     return;
   }
   motor_ = std::move(*result);
@@ -51,7 +51,7 @@ void MotorWorker::Connect(int id, MotorConnection connection) {
   if (!configured.ok()) {
     motor_.reset();
     emit StateChanged({axis_, ConnectionState::kDisconnected});
-    emit RequestFailed(id, {axis_, "Apply connection defaults", configured.error_message()});
+    emit RequestFailed(id, {axis_, "Apply connection defaults " + connection.serial_number, configured.error_message()});
     return;
   }
   poll_timer_->start(connection.polling_interval_ms);

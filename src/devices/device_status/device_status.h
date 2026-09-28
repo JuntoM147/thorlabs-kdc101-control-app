@@ -43,6 +43,7 @@ class DeviceStatus {
         [[nodiscard]] const std::string& error_message() const {return error_message_;}
 
         [[nodiscard]] bool ok() const {return error_code_ == DeviceStatusCode::kOk;}
+        [[nodiscard]] DeviceStatus WithContext(const std::string& context) const;
 
     private:
         DeviceStatus(DeviceStatusCode error_code, std::optional<short> kinesis_error_code, std::string error_message);

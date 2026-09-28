@@ -99,6 +99,13 @@ DeviceStatus DeviceStatus::Ok()
                         "Success");
 }
 
+DeviceStatus DeviceStatus::WithContext(const std::string& context) const
+{
+    auto result = *this;
+    if (!ok()) result.error_message_ = context + ": " + error_message_;
+    return result;
+}
+
 
 DeviceStatus DeviceStatus::FromKinesis(short kinesis_error_code)
 {

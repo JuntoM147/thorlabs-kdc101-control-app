@@ -11,6 +11,8 @@
 #include <ranges>
 #include <sstream>
 #include <utility>
+#include <mutex>
+#include <set>
 
 #include "device_status/device_status.h"
 #include "Thorlabs.MotionControl.KCube.DCServo.h"
@@ -24,12 +26,17 @@ constexpr char kStageID[] = "Z825";
 
 namespace {
 
+// Device enumeration and open/close mutate SDK-wide state across axis workers.
+// Recursive only so a partially constructed device can clean up on failure.
+std::recursive_mutex connection_mutex;
+std::set<std::string> open_serials;
+
 DeviceStatus GetDevices(std::vector<std::string>& serial_numbers)
 {
     // Build list of connected devices
     DeviceStatus build_list_status = DeviceStatus::FromKinesis(TLI_BuildDeviceList());
     if (!build_list_status.ok()) {
-        return build_list_status;
+        return build_list_status.WithContext("TLI_BuildDeviceList");
     }
 
     // get LTS serial numbers
@@ -38,7 +45,7 @@ DeviceStatus GetDevices(std::vector<std::string>& serial_numbers)
                                                                 static_cast<DWORD>(device_list_buffer.size()),
                                                                 kDeviceID));
     if (!device_list_status.ok()) {
-        return device_list_status;
+        return device_list_status.WithContext("TLI_GetDeviceListByTypeExt");
     }
 
     // populate vector with the serial numbers found
@@ -76,7 +83,7 @@ DeviceStatus FindDevice(const std::string& serial_number)
 DeviceStatus OpenDevice(const std::string& serial_number)
 {
     DeviceStatus open_status = DeviceStatus::FromKinesis(CC_Open(serial_number.c_str()));
-    if (!open_status.ok()) { return open_status; }
+    if (!open_status.ok()) { return open_status.WithContext("CC_Open"); }
 
     return DeviceStatus::Ok();
 }
@@ -85,7 +92,7 @@ DeviceStatus OpenDevice(const std::string& serial_number)
 DeviceStatus LoadSettings(const std::string& serial_number)
 {
     if (!CC_LoadSettings(serial_number.c_str()) && !CC_LoadNamedSettings(serial_number.c_str(), kStageID)) {
-        return DeviceStatus::FailedToLoadSettings(serial_number);
+        return DeviceStatus::FailedToLoadSettings(serial_number).WithContext("CC_LoadSettings / CC_LoadNamedSettings");
     }
 
     return DeviceStatus::Ok();
@@ -95,7 +102,7 @@ DeviceStatus LoadSettings(const std::string& serial_number)
 DeviceStatus EnableChannel(const std::string& serial_number)
 {
     DeviceStatus channel_status = DeviceStatus::FromKinesis(CC_EnableChannel(serial_number.c_str()));
-    if (!channel_status.ok()) { return channel_status; }
+    if (!channel_status.ok()) { return channel_status.WithContext("CC_EnableChannel"); }
 
     return DeviceStatus::Ok();
 }
@@ -105,7 +112,7 @@ DeviceStatus StartPolling(const std::string& serial_number, int polling_interval
 {
     // Start the device polling
     if (!CC_StartPolling(serial_number.c_str(), polling_interval_ms)) {
-        return DeviceStatus::FailedToStartPolling(serial_number);
+        return DeviceStatus::FailedToStartPolling(serial_number).WithContext("CC_StartPolling");
     }
 
     return DeviceStatus::Ok();
@@ -124,6 +131,11 @@ KDC101::KDC101(std::string serial_number, std::shared_ptr<const KinesisSimulatio
 
 KDC101::CreateResult KDC101::CreateMotor(std::string serial_number, int polling_interval_ms, std::shared_ptr<const KinesisSimulation> simulation)
 {
+    std::lock_guard lock(connection_mutex);
+    if (open_serials.contains(serial_number)) {
+        return std::unexpected(DeviceStatus::FromKinesis(32).WithContext(
+            "Serial " + serial_number + " is already owned by another motor connection in this application"));
+    }
     auto device = std::unique_ptr<KDC101>(new KDC101(serial_number, std::move(simulation)));
 
     // Find device
@@ -139,6 +151,7 @@ KDC101::CreateResult KDC101::CreateMotor(std::string serial_number, int polling_
     }
 
     device->connected_ = true;
+    open_serials.insert(serial_number);
 
     // Load Settings
     status = LoadSettings(serial_number);
@@ -168,6 +181,7 @@ KDC101::CreateResult KDC101::CreateMotor(std::string serial_number, int polling_
 
 KDC101::~KDC101()
 {
+    std::lock_guard lock(connection_mutex);
     if (connected_) {
         CC_ClearMessageQueue(serial_number_.c_str());
         CC_StopProfiled(serial_number_.c_str());    // No point waiting for stop to finish
@@ -183,6 +197,7 @@ KDC101::~KDC101()
 
     if (connected_) {
         CC_Close(serial_number_.c_str());
+        open_serials.erase(serial_number_);
     }
 }
 
