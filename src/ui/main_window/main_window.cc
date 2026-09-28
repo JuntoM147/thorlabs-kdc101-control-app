@@ -3,7 +3,6 @@
 #include <QTabWidget>
 #include <QStringList>
 #include <QWidget>
-#include <QDir>
 #include <QVBoxLayout>
 #include <utility>
 #include <exception>
@@ -272,7 +271,7 @@ void MainWindow::ResetRoute() {
   ShowMessage(tr("Route reset. Choose a starting pixel and click Set start."));
 }
 
-QStringList MainWindow::ScanStartBlockers(bool diagnostic) const {
+QStringList MainWindow::ScanStartBlockers() const {
   QStringList reasons;
   if (!backend_available_) reasons << tr("Application backend is unavailable.");
   if (controls_locked_ || scan_state_.phase != application::ScanPhase::kIdle)
@@ -293,7 +292,6 @@ QStringList MainWindow::ScanStartBlockers(bool diagnostic) const {
     reasons << tr("Confirm the laser output is OFF; its state is unknown.");
   else if (*laser_output_)
     reasons << tr("Turn the laser output OFF.");
-  if (diagnostic) return reasons;
   if (!has_pattern_) reasons << tr("Import an image with exposed pixels.");
   if (!std::isfinite(scan_configuration_.pixel_size_mm) || scan_configuration_.pixel_size_mm <= 0)
     reasons << tr("Enter a positive pixel size in micrometres per pixel.");
@@ -315,33 +313,31 @@ void MainWindow::SetPixelSizeMicrometres(double value) {
 
 void MainWindow::RequestScan() {
   if (!CanStartScan()) return;
-  motion_diagnostic_ = false;
   emit StartScanRequested(scan_configuration_);
-}
-
-void MainWindow::RequestMotionDiagnostic() {
-  if (!ScanStartBlockers(true).isEmpty()) return;
-  application::ScanConfiguration configuration;
-  configuration.motion_diagnostic = true;
-  configuration.pattern = algo::BinaryMatrix(1, 1);
-  configuration.pattern.Set(0, 0, true);
-  configuration.pixel_size_mm = 0.00025;
-  motion_diagnostic_ = true;
-  ShowMessage(tr("Motion test: laser OFF. Testing X/Y forward and backward at 0.25, 1 and 5 µm, twice. Use Stop to cancel."));
-  emit StartScanRequested(configuration);
 }
 
 void MainWindow::UpdateScanState(application::ScanState state) {
   scan_state_ = state;
-  if (motion_diagnostic_ && state.phase == application::ScanPhase::kIdle) {
-    ShowMessage(tr("Motion test %1. Position samples: %2")
-        .arg(state.total_instructions != 0 && state.completed_instructions == state.total_instructions
-                 ? tr("completed") : tr("cancelled"),
-             QDir::toNativeSeparators(QDir::temp().filePath("confo-quanta-position.csv"))));
-    motion_diagnostic_ = false;
-  }
+  if (state.phase != application::ScanPhase::kIdle) scan_has_run_ = true;
   emit ScanDisplayChanged(state);
   emit ScanAvailabilityChanged();
+}
+bool MainWindow::CanResetScan() const {
+  using application::ScanPhase;
+  return backend_available_ && !manual_requests_pending_ &&
+      (scan_state_.phase == ScanPhase::kFailed || scan_state_.phase == ScanPhase::kPaused ||
+       (scan_has_run_ && scan_state_.phase == ScanPhase::kIdle && !controls_locked_));
+}
+void MainWindow::RequestResetScan() {
+  if (!CanResetScan()) return;
+  ShowMessage(tr("Resetting: turning laser OFF and stopping motors..."));
+  emit ResetScanRequested();
+}
+void MainWindow::OnScanResetCompleted() {
+  scan_has_run_ = false;
+  ResetRoute();
+  emit ScanAvailabilityChanged();
+  ShowMessage(tr("Reset complete: laser OFF, motors stopped, manual controls available. Set the starting pixel before scanning."));
 }
 
 void MainWindow::ShowMessage(const QString& message, bool error) {

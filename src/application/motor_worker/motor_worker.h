@@ -30,7 +30,7 @@ class MotorWorker : public QObject {
   void ConfigureMotion(int id, MotorSettings settings);
   void Home(int id);
   void MoveAbsolute(int id, double position_mm);
-  void MoveRelative(int id, double distance_mm, bool diagnostic = false);
+  void MoveRelative(int id, double distance_mm);
   void Jog(int id, Direction direction);
   void Drive(int id, Direction direction);
   void Stop(int id, StopMode mode);
@@ -65,7 +65,6 @@ class MotorWorker : public QObject {
     double distance_mm;
     double tolerance_mm;
     QElapsedTimer completed_since;
-    bool diagnostic = false;
     int id = 0;
   };
   std::optional<RelativeMoveCheck> relative_move_check_;

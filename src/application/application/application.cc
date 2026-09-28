@@ -42,6 +42,11 @@ Application::Application(QObject* parent) : QObject(parent) {
   connect(scan_.get(), &ScanController::ScanCompleted, this, &Application::OnScanCompleted);
   connect(scan_.get(), &ScanController::ScanCancelled, this, &Application::OnScanCancelled);
   connect(scan_.get(), &ScanController::ScanFailed, this, &Application::OnScanFailed);
+  connect(scan_.get(), &ScanController::ResetCompleted, this, [this] {
+    state_ = ApplicationState::kManual;
+    emit ControlsLocked(false);
+    emit ScanResetCompleted();
+  });
 }
 Application::~Application() {
   // Destroy the scan first; its borrowed controllers remain alive during teardown.
@@ -172,6 +177,19 @@ void Application::StartScan(ScanConfiguration configuration) {
 void Application::PauseScan() { scan_->Pause(); }
 void Application::ResumeScan() { scan_->Resume(); }
 void Application::CancelScan() { scan_->Cancel(); }
+void Application::ResetScan() {
+  if (HasPendingManualRequests()) {
+    emit RequestFailed({{}, "Reset scan", "Wait for pending manual commands to finish."});
+    return;
+  }
+  if (!scan_->CanReset()) {
+    emit RequestFailed({{}, "Reset scan", "Wait until the scan is paused, stopped or failed."});
+    return;
+  }
+  state_ = ApplicationState::kScanning;
+  emit ControlsLocked(true);
+  scan_->Reset();
+}
 void Application::FinishManualRequest(int id) {
   if (!pending_operations_.erase(id)) return;
   pending_settings_.erase(id);

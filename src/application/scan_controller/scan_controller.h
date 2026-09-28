@@ -25,17 +25,23 @@ class ScanController : public QObject {
   ~ScanController() override;
 
   [[nodiscard]] std::expected<void, OperationError> Configure(ScanConfiguration configuration);
+  bool CanReset() const {
+    return !pending_device_ && (state_.phase == ScanPhase::kIdle ||
+        state_.phase == ScanPhase::kFailed || state_.phase == ScanPhase::kPaused);
+  }
 
  public slots:
   void Start();
   void Pause();
   void Resume();
   void Cancel();
+  void Reset();
 
  signals:
   void StateChanged(application::ScanState state);
   void ScanCompleted();
   void ScanCancelled();
+  void ResetCompleted();
   void ScanFailed(application::OperationError error);
   void RequestFailed(application::OperationError error);
 
@@ -85,6 +91,7 @@ class ScanController : public QObject {
 
   bool program_output_enabled_ = false;  // Output to restore after pause
   bool cancelled_ = false;  // report scan cancelled or failed after clean up
+  bool resetting_ = false;
   std::optional<OperationError> failure_error_;
 };
 

@@ -54,6 +54,7 @@ class Application : public QObject {
   void PauseScan();
   void ResumeScan();
   void CancelScan();
+  void ResetScan();
 
 // Notifications sent back to the UI
  signals:
@@ -66,6 +67,7 @@ class Application : public QObject {
   void LaserRequestPending(bool pending);
   void AxisRequestsPending(application::Axis axis, bool pending, bool stopping);
   void ScanStateUpdated(application::ScanState state);
+  void ScanResetCompleted();
   void RequestFailed(application::OperationError error);
 
 // Internal functions to handle worker signals

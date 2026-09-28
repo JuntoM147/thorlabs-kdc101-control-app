@@ -36,7 +36,7 @@ class MotorController : public QObject {
   // ID-free scan API. Application reserves access; reject manual commands while
   // scan work is pending. At most one scan operation may be outstanding.
   void ConfigureForScan(MotionSettings settings);
-  void MoveRelativeForScan(double distance_mm, bool diagnostic = false);
+  void MoveRelativeForScan(double distance_mm);
   void StopForScan(StopMode mode);
   // Stop active motion and drain both original/stop replies before notification.
   void CancelScanOperation();

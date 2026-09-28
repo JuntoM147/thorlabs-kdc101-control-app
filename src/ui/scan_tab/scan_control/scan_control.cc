@@ -52,7 +52,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   set_start->setToolTip(QObject::tr("Map this image pixel to the current stage position."));
   auto* route_buttons = new QHBoxLayout();
   route_buttons->setSpacing(8);
-  route_buttons->addWidget(set_start);
+  settings->addWidget(set_start, 1, 2);
   auto* preview_route = new QPushButton(QObject::tr("Preview route"), section);
   preview_route->setAccessibleName(QObject::tr("Preview route"));
   preview_route->setCheckable(true);
@@ -64,13 +64,9 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   preview_route->setText(QObject::tr("Preview route"));
   preview_route->setToolTip(QObject::tr("Show or hide the algorithm route from the applied starting pixel. No hardware is moved."));
   route_buttons->addWidget(preview_route);
-  auto* reset_route = new QPushButton(QObject::tr("Reset"), section);
-  reset_route->setAccessibleName(QObject::tr("Reset route and start pixel"));
-  reset_route->setToolTip(QObject::tr("Discard the route and applied start pixel, keeping the image."));
-  route_buttons->addWidget(reset_route);
   layout->addLayout(settings);
   layout->addLayout(route_buttons);
-  auto update_start_controls = [&view, start_x, start_y, set_start, preview_route, reset_route] {
+  auto update_start_controls = [&view, start_x, start_y, set_start, preview_route] {
     const bool enabled = view.CanSetStartPixel();
     start_x->setEnabled(enabled);
     start_y->setEnabled(enabled);
@@ -79,14 +75,8 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
     const QSignalBlocker blocker(preview_route);
     preview_route->setChecked(view.RoutePreviewVisible());
     preview_route->setText(view.RoutePreviewVisible() ? QObject::tr("Hide route") : QObject::tr("Preview route"));
-    reset_route->setEnabled(view.CanResetRoute());
   };
   QObject::connect(preview_route, &QPushButton::toggled, &view, &MainWindow::SetRoutePreviewVisible);
-  QObject::connect(reset_route, &QPushButton::clicked, section, [&view, start_x] {
-    view.ResetRoute();
-    start_x->setFocus();
-    start_x->selectAll();
-  });
   QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, update_start_controls);
   update_start_controls();
   QObject::connect(set_start, &QPushButton::clicked, section, [&view, start_x, start_y] {
@@ -146,15 +136,12 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   buttons->insertWidget(2, resume, 1);
   layout->addLayout(buttons);
 
-  auto* diagnostic = new QPushButton(QObject::tr("Motion test (laser off)"), section);
-  diagnostic->setAccessibleName(QObject::tr("Motion test (laser off)"));
-  diagnostic->setToolTip(QObject::tr("Moves X and Y by +/−0.25, 1 and 5 µm, twice, from the current position. Allow 5 µm positive travel on each axis. Stops at the first position mismatch. Logs position samples; no image needed."));
-  diagnostic->setEnabled(false);
-  layout->addWidget(diagnostic);
-  QObject::connect(diagnostic, &QPushButton::clicked, &view, &MainWindow::RequestMotionDiagnostic);
-  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
-    diagnostic->setEnabled(view.ScanStartBlockers(true).isEmpty());
-  });
+  auto* reset = new QPushButton(QObject::tr("Reset"), section);
+  reset->setAccessibleName(QObject::tr("Reset scan"));
+  reset->setToolTip(QObject::tr("Turn laser OFF, stop all motors and return to manual control. Keeps the image; clears progress and the applied starting pixel. Does not home or move to zero."));
+  reset->setEnabled(false);
+  buttons->addWidget(reset, 1);
+  QObject::connect(reset, &QPushButton::clicked, &view, &MainWindow::RequestResetScan);
 
   QObject::connect(start, &QPushButton::clicked, &view, &MainWindow::RequestScan);
   QObject::connect(pause, &QPushButton::clicked, &view, &MainWindow::PauseScanRequested);
@@ -163,6 +150,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
     using application::ScanPhase;
     const auto phase = view.ScanPhase();
+    reset->setEnabled(view.CanResetScan());
     const auto blockers = view.ScanStartBlockers();
     start->setEnabled(blockers.isEmpty());
     start->setToolTip(blockers.isEmpty()

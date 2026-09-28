@@ -165,7 +165,7 @@ void MotorWorker::MoveAbsolute(int id, double position) {
   }
   BeginMotion(id, OperationState::kMoving, [=, this] { return motor_->StartMoveAbsolute(position); });
 }
-void MotorWorker::MoveRelative(int id, double distance, bool diagnostic) {
+void MotorWorker::MoveRelative(int id, double distance) {
   if (!std::isfinite(distance)) {
     emit RequestFailed(id, {axis_, "Move", "Invalid distance."}); return;
   }
@@ -177,7 +177,6 @@ void MotorWorker::MoveRelative(int id, double distance, bool diagnostic) {
       const auto resolution = motor_->GetDistanceResolution();
       if (!resolution) return resolution.error();
       relative_move_check_ = RelativeMoveCheck{*position, distance, std::max(0.00002, *resolution), {}};
-      relative_move_check_->diagnostic = diagnostic;
       relative_move_check_->id = id;
       for (const auto& sample : recent_positions_)
         TracePosition("before", sample.timestamp, sample.position, sample.moving);
@@ -201,7 +200,7 @@ void MotorWorker::TracePosition(const char* phase, qint64 timestamp, double posi
   const auto& check = *relative_move_check_;
   out.setRealNumberPrecision(17);
   out << trace_session_ << ',' << QString::fromStdString(serial_number_) << ','
-      << "XYZ"[static_cast<int>(axis_)] << ',' << check.id << ',' << check.diagnostic << ','
+      << "XYZ"[static_cast<int>(axis_)] << ',' << check.id << ",0,"
       << phase << ',' << timestamp << ','
       << (check.completed_since.isValid() ? check.completed_since.elapsed() : -1) << ','
       << position << ',' << check.start_mm << ',' << check.distance_mm << ','
@@ -296,7 +295,7 @@ void MotorWorker::PollDevice() {
           std::abs(*position - expected) <= check.tolerance_mm + 1e-12;
       // Completion and the SDK's cached position may arrive on different polls.
       const qint64 grace_ms = std::max<qint64>(500, 3LL * poll_timer_->interval());
-      completed = reached && (!check.diagnostic || check.completed_since.elapsed() >= grace_ms);
+      completed = reached;
       if (!reached && check.completed_since.elapsed() >= grace_ms) {
         std::ostringstream message;
         message << std::fixed << std::setprecision(6)

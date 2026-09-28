@@ -24,6 +24,8 @@ void BindApplication(MainWindow& view, Application& application) {
   QObject::connect(&view, &MainWindow::PauseScanRequested, &application, &Application::PauseScan);
   QObject::connect(&view, &MainWindow::ResumeScanRequested, &application, &Application::ResumeScan);
   QObject::connect(&view, &MainWindow::CancelScanRequested, &application, &Application::CancelScan);
+  QObject::connect(&view, &MainWindow::ResetScanRequested, &application, &Application::ResetScan);
+  QObject::connect(&application, &Application::ScanResetCompleted, &view, &MainWindow::OnScanResetCompleted);
 
   QObject::connect(&application, &Application::AxisSettingsApplied, &view, &MainWindow::AxisSettingsApplied);
   QObject::connect(&application, &Application::AxisStateUpdated, &view, &MainWindow::AxisStateUpdated);

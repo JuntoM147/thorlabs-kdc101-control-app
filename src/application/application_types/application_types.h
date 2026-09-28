@@ -65,7 +65,6 @@ inline MotorSettings DefaultMotorSettings() {
 }
 
 struct ScanConfiguration {
-  bool motion_diagnostic = false; // Fixed laser-OFF sequence; retains endpoint checks.
   algo::BinaryMatrix pattern;
   // Pixel mapped to the current physical X/Y position.
   algo::PixelPosition start_pixel;

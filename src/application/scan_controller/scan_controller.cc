@@ -99,22 +99,7 @@ void ScanController::ContinueStopAndOff() {
     if (state_.phase == ScanPhase::kPreparing) {
       // Confirm OFF/stopped before potentially expensive instruction generation.
       try {
-        if (configuration_.motion_diagnostic) {
-          // Fixed physical distances independent of the image and user pixel size.
-          configuration_.pixel_size_mm = 0.00025;
-          configuration_.exposure_time = std::chrono::milliseconds(600);
-          program_.push_back(algo::Action::kWait); // Collect idle samples before the first move.
-          for (int repeat = 0; repeat < 2; ++repeat) {
-            for (int axis = 0; axis < 2; ++axis) {
-              for (int pixels : {1, 4, 20}) {
-                program_.push_back(algo::MoveRelative{axis == 0 ? pixels : 0, axis == 1 ? pixels : 0});
-                program_.push_back(algo::MoveRelative{axis == 0 ? -pixels : 0, axis == 1 ? -pixels : 0});
-              }
-            }
-          }
-        } else {
-          program_ = algo::GenerateInstructions(configuration_.start_pixel, configuration_.pattern);
-        }
+        program_ = algo::GenerateInstructions(configuration_.start_pixel, configuration_.pattern);
       } catch (const std::exception& error) {
         FailScan({{}, "Generate scan", error.what()}); return;
       }
@@ -154,7 +139,7 @@ void ScanController::ExecuteNextInstruction() {
       if (move->dx != 0) {
         AwaitDevice(Device::kX);
         pending_distance_ = move->dx * configuration_.pixel_size_mm;
-        motors_[0].get().MoveRelativeForScan(move->dx * configuration_.pixel_size_mm, configuration_.motion_diagnostic);
+        motors_[0].get().MoveRelativeForScan(move->dx * configuration_.pixel_size_mm);
         return;
       }
     }
@@ -163,7 +148,7 @@ void ScanController::ExecuteNextInstruction() {
       if (move->dy != 0) {
         AwaitDevice(Device::kY);
         pending_distance_ = move->dy * configuration_.pixel_size_mm;
-        motors_[1].get().MoveRelativeForScan(move->dy * configuration_.pixel_size_mm, configuration_.motion_diagnostic);
+        motors_[1].get().MoveRelativeForScan(move->dy * configuration_.pixel_size_mm);
         return;
       }
     }
@@ -251,6 +236,21 @@ void ScanController::StopMotorsAndTurnOutputOff() {
   substep_ = 0;
   emit StateChanged(state_);
   ContinueStopAndOff();
+}
+void ScanController::Reset() {
+  if (!CanReset()) {
+    emit RequestFailed({{}, "Reset scan", "Wait until the scan is paused, stopped or failed."});
+    return;
+  }
+  failure_error_.reset();
+  resetting_ = true;
+  cancelled_ = false;
+  program_output_enabled_ = false;
+  configuration_ = {};
+  configuration_.motion_timeout = std::chrono::seconds(10);
+  program_.clear();
+  state_.completed_instructions = state_.total_instructions = 0;
+  StopMotorsAndTurnOutputOff();
 }
 void ScanController::FailScan(OperationError error) {
   if (!failure_error_) failure_error_ = std::move(error);
@@ -351,8 +351,14 @@ void ScanController::FinishScan() {
   configuration_ = {};
   program_.clear();
   state_.phase = failure_error_ ? ScanPhase::kFailed : ScanPhase::kIdle;
+  const bool reset = std::exchange(resetting_, false);
+  if (reset && failure_error_) {
+    failure_error_->operation = "Reset scan / " + failure_error_->operation;
+    failure_error_->message += " Reset could not confirm laser OFF and all motors stopped. Manual controls remain locked.";
+  }
   emit StateChanged(state_);
   if (failure_error_) emit ScanFailed(*failure_error_);
+  else if (reset) emit ResetCompleted();
   else if (cancelled_) emit ScanCancelled();
   else emit ScanCompleted();
 }
