@@ -93,14 +93,14 @@ void MotorController::ConfigureForScan(MotionSettings settings) {
     worker.ConfigureMotion(id, configuration);
   });
 }
-void MotorController::MoveRelativeForScan(double distance) {
+void MotorController::MoveRelativeForScan(double distance, bool diagnostic) {
   if (scan_request_ || scan_stop_request_) {
     emit ScanOperationFailed(axis_, {axis_, "Scan move", "An operation is already pending."}); return;
   }
   const int id = NextScanRequestId();
   if (!id) { emit ScanOperationFailed(axis_, {axis_, "Scan move", "Request IDs exhausted."}); return; }
   scan_request_ = id;
-  Dispatch(id, [=](MotorWorker& worker) { worker.MoveRelative(id, distance); });
+  Dispatch(id, [=](MotorWorker& worker) { worker.MoveRelative(id, distance, diagnostic); });
 }
 void MotorController::StopForScan(StopMode mode) {
   if (scan_request_ || scan_stop_request_) {

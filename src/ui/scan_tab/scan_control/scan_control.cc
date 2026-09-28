@@ -146,6 +146,16 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   buttons->insertWidget(2, resume, 1);
   layout->addLayout(buttons);
 
+  auto* diagnostic = new QPushButton(QObject::tr("Motion test (laser off)"), section);
+  diagnostic->setAccessibleName(QObject::tr("Motion test (laser off)"));
+  diagnostic->setToolTip(QObject::tr("Moves X and Y by +/−0.25, 1 and 5 µm, twice, from the current position. Allow 5 µm positive travel on each axis. Stops at the first position mismatch. Logs position samples; no image needed."));
+  diagnostic->setEnabled(false);
+  layout->addWidget(diagnostic);
+  QObject::connect(diagnostic, &QPushButton::clicked, &view, &MainWindow::RequestMotionDiagnostic);
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
+    diagnostic->setEnabled(view.ScanStartBlockers(true).isEmpty());
+  });
+
   QObject::connect(start, &QPushButton::clicked, &view, &MainWindow::RequestScan);
   QObject::connect(pause, &QPushButton::clicked, &view, &MainWindow::PauseScanRequested);
   QObject::connect(resume, &QPushButton::clicked, &view, &MainWindow::ResumeScanRequested);

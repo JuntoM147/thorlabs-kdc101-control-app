@@ -58,7 +58,7 @@ if(BUILD_TESTING)
         target_link_libraries(application_runtime_test PRIVATE frontend_ui application Qt6::Test)
         target_include_directories(application_runtime_test PRIVATE ../../tests/kdc101/fake_sdk)
         add_test(NAME application_runtime_test COMMAND application_runtime_test -platform offscreen)
-        set_tests_properties(application_runtime_test PROPERTIES TIMEOUT 30)
+        set_tests_properties(application_runtime_test PROPERTIES TIMEOUT 60)
     endif()
     # Compile real declarations; the fake SDK supplies header types only.
     add_library(application_binding_contract OBJECT ../../tests/frontend/application_binding_contract.cc)

@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include <optional>
+#include <deque>
 
 #include <QObject>
 #include <QElapsedTimer>
@@ -29,7 +30,7 @@ class MotorWorker : public QObject {
   void ConfigureMotion(int id, MotorSettings settings);
   void Home(int id);
   void MoveAbsolute(int id, double position_mm);
-  void MoveRelative(int id, double distance_mm);
+  void MoveRelative(int id, double distance_mm, bool diagnostic = false);
   void Jog(int id, Direction direction);
   void Drive(int id, Direction direction);
   void Stop(int id, StopMode mode);
@@ -50,6 +51,7 @@ class MotorWorker : public QObject {
   void BeginMotion(int id, OperationState operation,
                    const std::function<thorlabs::DeviceStatus()>& start);
   void FailDevice(OperationError error);
+  void TracePosition(const char* phase, qint64 timestamp, double position, bool moving);
   thorlabs::DeviceStatus ApplyMotionSettings(const MotorSettings& settings);
   OperationState operation_ = OperationState::kIdle;  // Current command, not feedback.
   const Axis axis_;
@@ -63,8 +65,14 @@ class MotorWorker : public QObject {
     double distance_mm;
     double tolerance_mm;
     QElapsedTimer completed_since;
+    bool diagnostic = false;
+    int id = 0;
   };
   std::optional<RelativeMoveCheck> relative_move_check_;
+  struct PositionSample { qint64 timestamp; double position; bool moving; };
+  std::deque<PositionSample> recent_positions_;
+  QString trace_session_;
+  std::string serial_number_;
   bool shutting_down_ = false;  // Reject new commands while hardware cleanup runs
 };
 

@@ -5,6 +5,12 @@
 #include <iomanip>
 #include <sstream>
 #include <utility>
+#include <mutex>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
+#include <QUuid>
 
 namespace application {
 namespace {
@@ -42,6 +48,9 @@ void MotorWorker::Connect(int id, MotorConnection connection) {
     return;
   }
   motor_ = std::move(*result);
+  serial_number_ = connection.serial_number;
+  trace_session_ = QUuid::createUuid().toString(QUuid::WithoutBraces);
+  recent_positions_.clear();
   const auto observed = motor_->GetStatus();
   if (!observed || Moving(*observed)) {
     motor_.reset();
@@ -156,7 +165,7 @@ void MotorWorker::MoveAbsolute(int id, double position) {
   }
   BeginMotion(id, OperationState::kMoving, [=, this] { return motor_->StartMoveAbsolute(position); });
 }
-void MotorWorker::MoveRelative(int id, double distance) {
+void MotorWorker::MoveRelative(int id, double distance, bool diagnostic) {
   if (!std::isfinite(distance)) {
     emit RequestFailed(id, {axis_, "Move", "Invalid distance."}); return;
   }
@@ -168,11 +177,36 @@ void MotorWorker::MoveRelative(int id, double distance) {
       const auto resolution = motor_->GetDistanceResolution();
       if (!resolution) return resolution.error();
       relative_move_check_ = RelativeMoveCheck{*position, distance, std::max(0.00002, *resolution), {}};
+      relative_move_check_->diagnostic = diagnostic;
+      relative_move_check_->id = id;
+      for (const auto& sample : recent_positions_)
+        TracePosition("before", sample.timestamp, sample.position, sample.moving);
+      TracePosition("command", QDateTime::currentMSecsSinceEpoch(), *position, false);
     }
     const auto result = motor_->StartMoveRelative(distance);
     if (!result.ok()) relative_move_check_.reset();
     return result;
   });
+}
+void MotorWorker::TracePosition(const char* phase, qint64 timestamp, double position, bool moving) {
+  if (!relative_move_check_) return;
+  // Best effort: a full/unavailable log must never prevent Stop or a device reply.
+  static std::mutex mutex;
+  std::lock_guard lock(mutex);
+  QFile file(QDir::temp().filePath("confo-quanta-position.csv"));
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) return;
+  QTextStream out(&file);
+  if (file.size() == 0)
+    out << "session,serial,axis,request,diagnostic,phase,unix_ms,after_completion_ms,position_mm,start_mm,requested_mm,observed_mm,error_mm,tolerance_mm,moving\n";
+  const auto& check = *relative_move_check_;
+  out.setRealNumberPrecision(17);
+  out << trace_session_ << ',' << QString::fromStdString(serial_number_) << ','
+      << "XYZ"[static_cast<int>(axis_)] << ',' << check.id << ',' << check.diagnostic << ','
+      << phase << ',' << timestamp << ','
+      << (check.completed_since.isValid() ? check.completed_since.elapsed() : -1) << ','
+      << position << ',' << check.start_mm << ',' << check.distance_mm << ','
+      << position - check.start_mm << ',' << position - check.start_mm - check.distance_mm << ','
+      << check.tolerance_mm << ',' << moving << '\n';
 }
 void MotorWorker::Jog(int id, Direction direction) {
   if (direction != Direction::kForward && direction != Direction::kBackward) {
@@ -229,6 +263,9 @@ void MotorWorker::PollDevice() {
     FailDevice({axis_, "Poll", !status ? status.error().error_message() : position.error().error_message()});
     return;
   }
+  const auto timestamp = QDateTime::currentMSecsSinceEpoch();
+  recent_positions_.push_back({timestamp, *position, Moving(*status)});
+  if (recent_positions_.size() > 4) recent_positions_.pop_front();
   bool completed = false;
   bool stopped = false;
   // Bound event draining so a noisy device cannot starve commands or timers.
@@ -246,23 +283,29 @@ void MotorWorker::PollDevice() {
   std::optional<int> stop;
   std::optional<int> failed;
   std::optional<OperationError> position_error;
+  if (relative_move_check_) {
+    if (completed && !relative_move_check_->completed_since.isValid())
+      relative_move_check_->completed_since.start();
+    TracePosition(completed ? "completion" : "poll", timestamp, *position, Moving(*status));
+  }
   if (active_request_ && relative_move_check_ && !stop_request_ && !stopped && !Moving(*status)) {
     auto& check = *relative_move_check_;
-    if (completed && !check.completed_since.isValid()) check.completed_since.start();
     if (check.completed_since.isValid()) {
       const double expected = check.start_mm + check.distance_mm;
       const bool reached = std::isfinite(expected) && std::isfinite(*position) &&
           std::abs(*position - expected) <= check.tolerance_mm + 1e-12;
       // Completion and the SDK's cached position may arrive on different polls.
       const qint64 grace_ms = std::max<qint64>(500, 3LL * poll_timer_->interval());
-      completed = reached;
+      completed = reached && (!check.diagnostic || check.completed_since.elapsed() >= grace_ms);
       if (!reached && check.completed_since.elapsed() >= grace_ms) {
         std::ostringstream message;
         message << std::fixed << std::setprecision(6)
                 << "Scan stopped: motor completed at an unexpected position. Requested travel "
                 << check.distance_mm << " mm; observed travel " << *position - check.start_mm
                 << " mm. Start " << check.start_mm << " mm; expected " << expected
-                << " mm; actual " << *position << " mm; tolerance " << check.tolerance_mm << " mm.";
+                << " mm; actual " << *position << " mm; tolerance " << check.tolerance_mm
+                << " mm. Position samples: "
+                << QDir::toNativeSeparators(QDir::temp().filePath("confo-quanta-position.csv")).toStdString();
         position_error = OperationError{axis_, "Scan position check", message.str()};
         failed = std::exchange(active_request_, {});
       }
@@ -275,6 +318,8 @@ void MotorWorker::PollDevice() {
     if (stopped) cancelled = std::exchange(active_request_, {});
     else done = std::exchange(active_request_, {});
   }
+  if (relative_move_check_ && (failed || done || cancelled))
+    TracePosition(failed ? "failed" : (cancelled ? "cancelled" : "passed"), timestamp, *position, Moving(*status));
   if (!active_request_ && !stop_request_) {
     operation_ = OperationState::kIdle;
     relative_move_check_.reset();

@@ -30,7 +30,7 @@ class MainWindow : public QMainWindow {
   const algo::Program& PreviewProgram() const { return preview_program_; }
   algo::PixelPosition StartPixel() const { return scan_configuration_.start_pixel; }
   bool CanStartScan() const;
-  QStringList ScanStartBlockers() const;
+  QStringList ScanStartBlockers(bool diagnostic = false) const;
   bool CanSetStartPixel() const { return !controls_locked_ && !scan_image_size_.isEmpty(); }
   bool HasBackend() const { return backend_available_; }
   application::ScanPhase ScanPhase() const { return scan_state_.phase; }
@@ -42,6 +42,7 @@ class MainWindow : public QMainWindow {
   void ShowMessage(const QString& message, bool error = false);
   void ShowError(application::OperationError error);
   void RequestScan();
+  void RequestMotionDiagnostic();
 
  signals:
   // User intent. Application decides whether requests can be serviced.
@@ -87,6 +88,7 @@ class MainWindow : public QMainWindow {
   bool controls_locked_ = false;
   bool has_pattern_ = false;
   bool start_pixel_set_ = false;
+  bool motion_diagnostic_ = false;
   QSize scan_image_size_;
   algo::Program preview_program_;
   application::ScanConfiguration scan_configuration_;
