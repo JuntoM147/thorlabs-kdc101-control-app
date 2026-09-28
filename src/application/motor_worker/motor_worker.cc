@@ -1,6 +1,9 @@
 #include "motor_worker.h"
 
 #include <cmath>
+#include <algorithm>
+#include <iomanip>
+#include <sstream>
 #include <utility>
 
 namespace application {
@@ -88,6 +91,7 @@ void MotorWorker::BeginMotion(int id, OperationState operation,
     return;
   }
   auto result = motor_->ClearMessageQueue();
+  relative_move_check_.reset();
   if (result.ok()) result = start();
   if (!result.ok()) {
     emit RequestFailed(id, {axis_, "Motion", result.error_message()});
@@ -156,7 +160,19 @@ void MotorWorker::MoveRelative(int id, double distance) {
   if (!std::isfinite(distance)) {
     emit RequestFailed(id, {axis_, "Move", "Invalid distance."}); return;
   }
-  BeginMotion(id, OperationState::kMoving, [=, this] { return motor_->StartMoveRelative(distance); });
+  BeginMotion(id, OperationState::kMoving, [=, this] {
+    // Negative request IDs belong to scans. Manual operations retain their behavior.
+    if (id < 0) {
+      const auto position = motor_->GetPosition();
+      if (!position) return position.error();
+      const auto resolution = motor_->GetDistanceResolution();
+      if (!resolution) return resolution.error();
+      relative_move_check_ = RelativeMoveCheck{*position, distance, std::max(0.00002, *resolution), {}};
+    }
+    const auto result = motor_->StartMoveRelative(distance);
+    if (!result.ok()) relative_move_check_.reset();
+    return result;
+  });
 }
 void MotorWorker::Jog(int id, Direction direction) {
   if (direction != Direction::kForward && direction != Direction::kBackward) {
@@ -198,6 +214,7 @@ void MotorWorker::FailDevice(OperationError error) {
   poll_timer_->stop();
   motor_.reset();
   operation_ = OperationState::kIdle;
+  relative_move_check_.reset();
   emit StateChanged({axis_, ConnectionState::kFaulted});
   if (active) emit RequestFailed(*active, error);
   if (stop) emit RequestFailed(*stop, error);
@@ -227,6 +244,30 @@ void MotorWorker::PollDevice() {
   std::optional<int> done;
   std::optional<int> cancelled;
   std::optional<int> stop;
+  std::optional<int> failed;
+  std::optional<OperationError> position_error;
+  if (active_request_ && relative_move_check_ && !stop_request_ && !stopped && !Moving(*status)) {
+    auto& check = *relative_move_check_;
+    if (completed && !check.completed_since.isValid()) check.completed_since.start();
+    if (check.completed_since.isValid()) {
+      const double expected = check.start_mm + check.distance_mm;
+      const bool reached = std::isfinite(expected) && std::isfinite(*position) &&
+          std::abs(*position - expected) <= check.tolerance_mm + 1e-12;
+      // Completion and the SDK's cached position may arrive on different polls.
+      const qint64 grace_ms = std::max<qint64>(500, 3LL * poll_timer_->interval());
+      completed = reached;
+      if (!reached && check.completed_since.elapsed() >= grace_ms) {
+        std::ostringstream message;
+        message << std::fixed << std::setprecision(6)
+                << "Scan stopped: motor completed at an unexpected position. Requested travel "
+                << check.distance_mm << " mm; observed travel " << *position - check.start_mm
+                << " mm. Start " << check.start_mm << " mm; expected " << expected
+                << " mm; actual " << *position << " mm; tolerance " << check.tolerance_mm << " mm.";
+        position_error = OperationError{axis_, "Scan position check", message.str()};
+        failed = std::exchange(active_request_, {});
+      }
+    }
+  }
   if (stop_request_ && !Moving(*status) && (!active_request_ || stopped)) {
     stop = std::exchange(stop_request_, {});
     cancelled = std::exchange(active_request_, {});
@@ -234,7 +275,10 @@ void MotorWorker::PollDevice() {
     if (stopped) cancelled = std::exchange(active_request_, {});
     else done = std::exchange(active_request_, {});
   }
-  if (!active_request_ && !stop_request_) operation_ = OperationState::kIdle;
+  if (!active_request_ && !stop_request_) {
+    operation_ = OperationState::kIdle;
+    relative_move_check_.reset();
+  }
   AxisState observation{axis_, ConnectionState::kConnected, operation_};
   // Also show motion initiated outside this application (for example, the handset).
   if (operation_ == OperationState::kIdle) {
@@ -251,6 +295,7 @@ void MotorWorker::PollDevice() {
   observation.hardware_moving = Moving(*status);
   observation.channel_enabled = status->channel_enabled;
   emit StateChanged(observation);
+  if (failed) emit RequestFailed(*failed, *position_error);
   if (cancelled) emit RequestCancelled(*cancelled);
   if (done) emit RequestCompleted(*done);
   if (stop) emit RequestCompleted(*stop);
@@ -261,6 +306,7 @@ void MotorWorker::Shutdown() {
   motor_.reset();  // Wrapper stops, disables and closes the device.
   active_request_.reset();
   stop_request_.reset();
+  relative_move_check_.reset();
   emit ShutdownReady(axis_);
 }
 }  // namespace application

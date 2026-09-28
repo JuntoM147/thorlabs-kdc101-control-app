@@ -6,6 +6,7 @@
 #include <optional>
 
 #include <QObject>
+#include <QElapsedTimer>
 #include <QTimer>
 
 #include "../application_types/application_types.h"
@@ -57,6 +58,13 @@ class MotorWorker : public QObject {
   QTimer* poll_timer_ = nullptr;
   std::optional<int> active_request_;  // Motion request awaiting completion
   std::optional<int> stop_request_;  // Stop request awaiting confirmation of stopped motion
+  struct RelativeMoveCheck {
+    double start_mm;
+    double distance_mm;
+    double tolerance_mm;
+    QElapsedTimer completed_since;
+  };
+  std::optional<RelativeMoveCheck> relative_move_check_;
   bool shutting_down_ = false;  // Reject new commands while hardware cleanup runs
 };
 

@@ -73,6 +73,7 @@ class KDC101 {
         [[nodiscard]] static CreateResult CreateMotor(std::string serial_number, int polling_interval_ms = kDefaultPollingIntervalMs, std::shared_ptr<const KinesisSimulation> simulation = nullptr);
 
         [[nodiscard]] PositionResult GetPosition();
+        [[nodiscard]] PositionResult GetDistanceResolution();
         [[nodiscard]] std::expected<MotorStatus, DeviceStatus> GetStatus();
 
         // Configuration only, doesn't start movement

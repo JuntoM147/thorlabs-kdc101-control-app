@@ -6,6 +6,7 @@
 #include <QVBoxLayout>
 #include <utility>
 #include <exception>
+#include <cmath>
 #include "../../algo/algorithm/algorithm.h"
 
 #include "motor_tab/motor_information/motor_information.h"
@@ -21,8 +22,8 @@ namespace ui {
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
   setFixedSize(720, 840);
-  // Temporary scan defaults until calibration/exposure controls are introduced.
-  scan_configuration_.pixel_size_mm = 0.0001;  // 0.1 micrometres per pixel.
+  // Initial values, with pixel size editable in the Laser tab.
+  scan_configuration_.pixel_size_mm = 0.00025;  // 0.25 micrometres per pixel.
   scan_configuration_.exposure_time = std::chrono::milliseconds(10);
 
   setStyleSheet(QStringLiteral(R"(
@@ -292,6 +293,8 @@ QStringList MainWindow::ScanStartBlockers() const {
   else if (*laser_output_)
     reasons << tr("Turn the laser output OFF.");
   if (!has_pattern_) reasons << tr("Import an image with exposed pixels.");
+  if (!std::isfinite(scan_configuration_.pixel_size_mm) || scan_configuration_.pixel_size_mm <= 0)
+    reasons << tr("Enter a positive pixel size in micrometres per pixel.");
   if (!start_pixel_set_ || scan_configuration_.start_pixel.x >= scan_image_size_.width() ||
       scan_configuration_.start_pixel.y >= scan_image_size_.height())
     reasons << tr("Apply a valid starting pixel using Set start.");
@@ -300,6 +303,12 @@ QStringList MainWindow::ScanStartBlockers() const {
 
 bool MainWindow::CanStartScan() const {
   return ScanStartBlockers().isEmpty();
+}
+
+void MainWindow::SetPixelSizeMicrometres(double value) {
+  if (controls_locked_ || scan_state_.phase != application::ScanPhase::kIdle) return;
+  scan_configuration_.pixel_size_mm = value / 1000.0;
+  emit ScanAvailabilityChanged();
 }
 
 void MainWindow::RequestScan() {

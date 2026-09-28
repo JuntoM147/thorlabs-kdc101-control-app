@@ -4,6 +4,7 @@
 #include <QCheckBox>
 #include <QPainter>
 #include <memory>
+#include <limits>
 
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -151,12 +152,17 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual, &QWidget::setEnabled);
 
   auto* pixel_size_label = new QLabel(QObject::tr("Pixel size (µm/pixel)"), section);
-  auto* pixel_size = new QLineEdit(section);
+  auto* pixel_size = new QLineEdit(QString::number(view.PixelSizeMicrometres(), 'g', 12), section);
   pixel_size->setAccessibleName(QObject::tr("Pixel size in micrometres per pixel"));
   pixel_size->setAlignment(Qt::AlignRight);
-  pixel_size->setToolTip(QObject::tr("Not applied to scans yet."));
+  pixel_size->setToolTip(QObject::tr("Physical travel per image pixel. Applied to the next scan."));
   pixel_size_label->setBuddy(pixel_size);
-  // UI placeholder only; intentionally not connected to scan configuration.
+  QObject::connect(pixel_size, &QLineEdit::textChanged, section, [&view](const QString& text) {
+    bool ok = false;
+    const double value = text.toDouble(&ok);
+    view.SetPixelSizeMicrometres(ok ? value : std::numeric_limits<double>::quiet_NaN());
+  });
+  QObject::connect(&view, &MainWindow::ScanInputsEnabled, pixel_size, &QWidget::setEnabled);
   outer_layout->addWidget(pixel_size_label);
   outer_layout->addWidget(pixel_size);
   outer_layout->addStretch();

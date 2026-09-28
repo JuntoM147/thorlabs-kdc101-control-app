@@ -18,6 +18,8 @@ class MainWindow : public QMainWindow {
   void SetBackendAvailable(bool available);
   void SetScanImage(const QImage& image);
   void SetStartPixel(int x, int y);
+  void SetPixelSizeMicrometres(double value);
+  double PixelSizeMicrometres() const { return scan_configuration_.pixel_size_mm * 1000.0; }
   void SetRoutePreviewVisible(bool visible);
   void ResetRoute();
   bool CanPreviewRoute() const { return CanResetRoute() && has_pattern_; }

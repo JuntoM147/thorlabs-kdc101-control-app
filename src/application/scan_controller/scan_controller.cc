@@ -216,6 +216,8 @@ void ScanController::Cancel() {
   }
   cancelled_ = true;
   state_.phase = ScanPhase::kStopping;
+  state_.completed_instructions = 0;
+  state_.total_instructions = 0;
   emit StateChanged(state_);
   exposure_timer_->stop();
   if (pending_device_) {

@@ -13,6 +13,10 @@
 #include <utility>
 #include <mutex>
 #include <set>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <chrono>
 
 #include "device_status/device_status.h"
 #include "Thorlabs.MotionControl.KCube.DCServo.h"
@@ -30,6 +34,28 @@ namespace {
 // Recursive only so a partially constructed device can clean up on failure.
 std::recursive_mutex connection_mutex;
 std::set<std::string> open_serials;
+
+// Keep the SDK boundary observable in GUI builds, which have no console.
+// Logging failure must never affect a motor command.
+void TraceRelativeMove(const std::string& serial, double distance, int units,
+                       int position_before, short result) noexcept {
+    try {
+        static std::mutex trace_mutex;
+        std::lock_guard lock(trace_mutex);
+        std::error_code error;
+        const auto directory = std::filesystem::temp_directory_path(error);
+        if (error) return;
+        std::ofstream trace(directory / "confo-quanta-motion.log", std::ios::app);
+        const auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        trace << timestamp << " serial=" << serial << std::setprecision(17)
+              << " relative_mm=" << distance << " device_units=" << units
+              << " cached_position_before_units=" << position_before
+              << " sdk_result=" << result << '\n';
+    } catch (...) {
+        // Diagnostics are best effort, including when the temp directory is unavailable.
+    }
+}
 
 DeviceStatus GetDevices(std::vector<std::string>& serial_numbers)
 {
@@ -277,6 +303,16 @@ DeviceStatus KDC101::SetMoveVelocity(VelocityParameters parameters) {
     return ApplyVelocity(serial_number_, parameters, false);
 }
 
+KDC101::PositionResult KDC101::GetDistanceResolution() {
+    double resolution = 0;
+    const auto status = DeviceStatus::FromKinesis(CC_GetRealValueFromDeviceUnit(
+        serial_number_.c_str(), 1, &resolution, kUnitTypeDistance));
+    if (!status.ok()) return std::unexpected(status);
+    if (!std::isfinite(resolution) || resolution <= 0)
+        return std::unexpected(DeviceStatus::FromKinesis(FT_InvalidParameter));
+    return resolution;
+}
+
 DeviceStatus KDC101::SetJogVelocity(VelocityParameters parameters) {
     return ApplyVelocity(serial_number_, parameters, true);
 }
@@ -382,7 +418,10 @@ DeviceStatus KDC101::StartMoveRelative(double distance)
 
     // A zero displacement may never produce the completion event the worker awaits.
     if (device_units == 0) return DeviceStatus::MotionBelowResolution(serial_number_);
-    return DeviceStatus::FromKinesis(CC_MoveRelative(serial_number_.c_str(), device_units));
+    const int position_before = CC_GetPosition(serial_number_.c_str());
+    const short result = CC_MoveRelative(serial_number_.c_str(), device_units);
+    TraceRelativeMove(serial_number_, distance, device_units, position_before, result);
+    return DeviceStatus::FromKinesis(result);
 }
 
 

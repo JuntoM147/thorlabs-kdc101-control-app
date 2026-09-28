@@ -108,7 +108,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   progress->setAccessibleName(QObject::tr("Scan progress"));
   layout->addWidget(progress);
 
-  auto* estimated_time = new QLabel(QObject::tr("Idle"), section);
+  auto* estimated_time = new QLabel(section);
   estimated_time->setAccessibleName(QObject::tr("Scan state"));
   estimated_time->setAlignment(Qt::AlignCenter);
   estimated_time->setToolTip(QObject::tr("Reported scan phase."));
@@ -172,7 +172,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
     progress->setValue(percent);
     QString phase;
     switch (state.phase) {
-      case ScanPhase::kIdle: phase = QObject::tr("Idle"); break;
+      case ScanPhase::kIdle: break;
       case ScanPhase::kWaiting: phase = QObject::tr("Scan requested"); break;
       case ScanPhase::kPreparing: phase = QObject::tr("Preparing"); break;
       case ScanPhase::kRunning: phase = QObject::tr("Scanning"); break;
