@@ -9,3 +9,7 @@ cmake -S . -B build-app-cli -G "Visual Studio 17 2022" -A x64 `
 cmake --build build-app-cli --config Release --target frontend
 
 .\build-app-cli\Release\frontend.exe
+
+& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -all -products "*" -property displayName
+
+cmake --version
