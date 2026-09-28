@@ -12,6 +12,8 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <QLineEdit>
 #include <QLocale>
 #include <QPushButton>
@@ -21,8 +23,80 @@
 namespace ui {
 namespace {
 
-QPushButton* CreateCommandButton(const QString& text, QWidget* parent) {
-  auto* button = new QPushButton(text, parent);
+// A hold is one gesture: dragging out stops it, and dragging back in cannot restart it.
+class HoldDriveButton : public QPushButton {
+ public:
+  HoldDriveButton(const QString& text, QWidget* parent) : QPushButton(text, parent) {
+    setAutoRepeat(false);
+    window()->installEventFilter(this);
+  }
+
+ protected:
+  void mousePressEvent(QMouseEvent* event) override {
+    if (event->button() == Qt::LeftButton && rect().contains(event->position().toPoint())) {
+      BeginHold();
+      event->accept();
+    } else {
+      event->ignore();
+    }
+  }
+  void mouseReleaseEvent(QMouseEvent* event) override {
+    if (event->button() == Qt::LeftButton) EndHold();
+    event->accept();
+  }
+  void mouseMoveEvent(QMouseEvent* event) override {
+    if (!rect().contains(event->position().toPoint())) EndHold();
+    event->accept();
+  }
+  void keyPressEvent(QKeyEvent* event) override {
+    if (IsHoldKey(event->key())) {
+      if (!event->isAutoRepeat()) BeginHold();
+      event->accept();
+    } else {
+      QPushButton::keyPressEvent(event);
+    }
+  }
+  void keyReleaseEvent(QKeyEvent* event) override {
+    if (IsHoldKey(event->key())) {
+      if (!event->isAutoRepeat()) EndHold();
+      event->accept();
+    } else {
+      QPushButton::keyReleaseEvent(event);
+    }
+  }
+  bool event(QEvent* event) override {
+    if (event->type() == QEvent::FocusOut || event->type() == QEvent::Hide ||
+        (event->type() == QEvent::EnabledChange && !isEnabled())) EndHold();
+    return QPushButton::event(event);
+  }
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    if (event->type() == QEvent::WindowDeactivate || event->type() == QEvent::Hide ||
+        event->type() == QEvent::Close) EndHold();
+    return QPushButton::eventFilter(watched, event);
+  }
+
+ private:
+  static bool IsHoldKey(int key) {
+    return key == Qt::Key_Space || key == Qt::Key_Return || key == Qt::Key_Enter;
+  }
+  void BeginHold() {
+    if (holding_ || !isEnabled()) return;
+    holding_ = true;
+    setDown(true);
+    emit pressed();
+  }
+  void EndHold() {
+    if (!holding_) return;
+    holding_ = false;
+    setDown(false);
+    emit released();
+  }
+  bool holding_ = false;
+};
+
+QPushButton* CreateCommandButton(const QString& text, QWidget* parent, bool hold = false) {
+  auto* button = hold ? static_cast<QPushButton*>(new HoldDriveButton(text, parent))
+                      : new QPushButton(text, parent);
   button->setMinimumWidth(88);
   button->setFixedHeight(28);
   button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -81,8 +155,8 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
 
   auto* jog_down = CreateCommandButton(QStringLiteral("<"), section);
   auto* jog_up = CreateCommandButton(QStringLiteral(">"), section);
-  auto* drive_down = CreateCommandButton(QStringLiteral("<<"), section);
-  auto* drive_up = CreateCommandButton(QStringLiteral(">>"), section);
+  auto* drive_down = CreateCommandButton(QStringLiteral("<<"), section, true);
+  auto* drive_up = CreateCommandButton(QStringLiteral(">>"), section, true);
   jog_up->setAccessibleName(QObject::tr("%1 axis jog up").arg(axis));
   jog_down->setAccessibleName(QObject::tr("%1 axis jog down").arg(axis));
   drive_up->setAccessibleName(QObject::tr("%1 axis continuous move up").arg(axis));
@@ -242,12 +316,17 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   };
   QObject::connect(jog_up, &QPushButton::clicked, section, [jog] { jog(application::Direction::kForward); });
   QObject::connect(jog_down, &QPushButton::clicked, section, [jog] { jog(application::Direction::kBackward); });
-  QObject::connect(drive_up, &QPushButton::clicked, section, [&view, axis_id] {
+  QObject::connect(drive_up, &QPushButton::pressed, section, [&view, axis_id] {
     emit view.DriveAxisRequested(axis_id, application::Direction::kForward);
   });
-  QObject::connect(drive_down, &QPushButton::clicked, section, [&view, axis_id] {
+  QObject::connect(drive_down, &QPushButton::pressed, section, [&view, axis_id] {
     emit view.DriveAxisRequested(axis_id, application::Direction::kBackward);
   });
+  for (auto* button : {drive_up, drive_down}) {
+    QObject::connect(button, &QPushButton::released, section, [&view, axis_id, stop] {
+      if (stop->isEnabled()) emit view.StopAxisRequested(axis_id, application::StopMode::kProfiled);
+    });
+  }
   QObject::connect(home, &QPushButton::clicked, section, [&view, axis_id] { emit view.HomeAxisRequested(axis_id); });
   QObject::connect(stop, &QPushButton::clicked, section, [&view, axis_id] {
     emit view.StopAxisRequested(axis_id, application::StopMode::kProfiled);
@@ -261,8 +340,8 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   }
   jog_down->setToolTip(QObject::tr("Jog one applied step in the negative direction."));
   jog_up->setToolTip(QObject::tr("Jog one applied step in the positive direction."));
-  drive_down->setToolTip(QObject::tr("Move continuously in the negative direction until stopped."));
-  drive_up->setToolTip(QObject::tr("Move continuously in the positive direction until stopped."));
+  drive_down->setToolTip(QObject::tr("Press and hold to drive in the negative direction. Release to stop."));
+  drive_up->setToolTip(QObject::tr("Press and hold to drive in the positive direction. Release to stop."));
   struct Availability {
     application::AxisState state{};
     bool pending = false;
@@ -273,10 +352,16 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
     const auto& state = availability->state;
     const bool connected = state.connection == application::ConnectionState::kConnected;
     const bool ready = connected && state.operation == application::OperationState::kIdle && !availability->pending;
-    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button}) {
+    for (auto* button : {jog_up, jog_down, home, go_button}) {
       button->setEnabled(ready);
     }
     stop->setEnabled(connected && !availability->stopping && state.operation != application::OperationState::kStopping);
+    // Keep the held button enabled so it receives mouse/key release while the
+    // drive request is pending; all other movement controls remain locked.
+    for (auto* button : {drive_up, drive_down}) {
+      button->setEnabled(ready || (button->isDown() && connected && !availability->stopping &&
+          state.operation != application::OperationState::kStopping));
+    }
     absolute_position->setEnabled(ready);
     step_size->setEnabled(ready);
     speed->setEnabled(ready);
