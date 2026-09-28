@@ -24,7 +24,7 @@ namespace {
 QPushButton* CreateCommandButton(const QString& text, QWidget* parent) {
   auto* button = new QPushButton(text, parent);
   button->setMinimumWidth(88);
-  button->setFixedHeight(28);
+  button->setFixedHeight(24);
   button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   button->setEnabled(false);
   button->setToolTip(QObject::tr("Motor is not connected."));
@@ -37,8 +37,8 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   section->setObjectName(QStringLiteral("axis%1").arg(axis));
 
   auto* layout = new QVBoxLayout(section);
-  layout->setContentsMargins(10, 4, 10, 4);
-  layout->setSpacing(4);
+  layout->setContentsMargins(10, 2, 10, 2);
+  layout->setSpacing(2);
 
   auto* header = new QHBoxLayout();
   header->setSpacing(6);
@@ -57,13 +57,13 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   body->setSpacing(12);
   layout->addLayout(body, 1);
   auto* manual = new QVBoxLayout();
-  manual->setSpacing(4);
+  manual->setSpacing(2);
   body->addLayout(manual, 4);
   auto* position_label = new QLabel(QObject::tr("Current position"), section);
   position_label->setObjectName(QStringLiteral("axisFieldLabel"));
   manual->addWidget(position_label);
   auto* readout_widget = new QWidget(section);
-  readout_widget->setFixedHeight(28);
+  readout_widget->setFixedHeight(24);
   readout_widget->setObjectName(QStringLiteral("axisReadout"));
   readout_widget->setStyleSheet("QWidget#axisReadout { background: transparent; }");
   auto* readout = new QHBoxLayout(readout_widget);
@@ -92,7 +92,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   }
   auto* motion = new QGridLayout();
   motion->setHorizontalSpacing(6);
-  motion->setVerticalSpacing(6);
+  motion->setVerticalSpacing(2);
   auto* jog_label = new QLabel(QObject::tr("Jog"), section);
   auto* drive_label = new QLabel(QObject::tr("Drive"), section);
   jog_label->setObjectName(QStringLiteral("axisFieldLabel"));
@@ -105,7 +105,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   motion->addWidget(drive_down, 1, 3);
   motion->addWidget(drive_up, 1, 4);
   manual->addLayout(motion);
-  manual->addSpacing(4);
+  manual->addSpacing(2);
   auto* actions = new QHBoxLayout();
   actions->setSpacing(8);
   auto* home = CreateCommandButton(QObject::tr("Home"), section);
@@ -125,7 +125,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   body->addWidget(divider);
   auto* inputs = new QGridLayout();
   inputs->setHorizontalSpacing(8);
-  inputs->setVerticalSpacing(4);
+  inputs->setVerticalSpacing(2);
   inputs->setColumnStretch(0, 1);
   body->addLayout(inputs, 5);
   auto add_field_label = [section, inputs](const QString& text, int row) {
@@ -140,7 +140,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   absolute_position->setRange(-1000000.0, 1000000.0);
   absolute_position->setButtonSymbols(QAbstractSpinBox::NoButtons);
   absolute_position->setMinimumWidth(84);
-  absolute_position->setFixedHeight(28);
+  absolute_position->setFixedHeight(24);
   absolute_position->setAlignment(Qt::AlignRight);
   absolute_position->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   absolute_position->setEnabled(false);
@@ -165,14 +165,14 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   validator->setLocale(QLocale::c());
   step_size->setValidator(validator);
   step_size->setMinimumWidth(84);
-  step_size->setFixedHeight(28);
+  step_size->setFixedHeight(24);
   step_size->lineEdit()->setAlignment(Qt::AlignRight);
   step_size->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   step_size->setAccessibleName(QObject::tr("%1 axis jog step size in mm").arg(axis));
   step_size->setToolTip(QObject::tr("Choose a preset or type a positive step size in mm."));
   step_size->setStyleSheet(
       "QComboBox { background: white; border: 1px solid #cfd8e5; border-radius: 4px; "
-      "padding: 2px 5px; min-height: 20px; }"
+      "padding: 1px 5px; min-height: 18px; }"
       "QComboBox:focus { border-color: #126bf0; }"
       "QComboBox QLineEdit { border: none; padding: 0; min-height: 0; }");
   inputs->addWidget(step_size, 3, 0);
@@ -201,7 +201,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   speed_validator->setLocale(QLocale::c());
   speed->setValidator(speed_validator);
   speed->setMinimumWidth(84);
-  speed->setFixedHeight(28);
+  speed->setFixedHeight(24);
   speed->setAlignment(Qt::AlignRight);
   speed->setEnabled(false);
   speed->setAccessibleName(QObject::tr("%1 axis speed in mm per second").arg(axis));
@@ -302,8 +302,8 @@ QWidget* CreateMotorControlSection(MainWindow& view, QWidget* parent) {
   section->setObjectName(QStringLiteral("motorControls"));
 
   auto* layout = new QVBoxLayout(section);
-  layout->setContentsMargins(6, 4, 6, 4);
-  layout->setSpacing(6);
+  layout->setContentsMargins(6, 2, 6, 2);
+  layout->setSpacing(4);
   int axis_index = 0;
   for (const auto& axis : {QStringLiteral("X"), QStringLiteral("Y"), QStringLiteral("Z")}) {
     layout->addWidget(CreateAxisControl(view, static_cast<application::Axis>(axis_index), axis, section));

@@ -22,7 +22,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   section->setObjectName(QStringLiteral("scan_control"));
 
   auto* layout = new QVBoxLayout(section);
-  layout->setSpacing(14);
+  layout->setSpacing(8);
 
   auto* settings = new QGridLayout();
   settings->setHorizontalSpacing(16);
@@ -101,7 +101,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   auto* progress = new QProgressBar(section);
   progress->setRange(0, 100);
   progress->setValue(0);
-  progress->setMinimumHeight(36);
+  progress->setMinimumHeight(26);
   progress->setAccessibleName(QObject::tr("Scan progress"));
   layout->addWidget(progress);
 
@@ -120,7 +120,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   start->setAccessibleName(QObject::tr("Start scan"));
   start->setToolTip(QObject::tr("The applied start pixel maps to the current stage position."));
   start->setEnabled(false);
-  start->setMinimumSize(88, 40);
+  start->setMinimumSize(88, 30);
   start->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   buttons->addWidget(start, 1);
 
@@ -129,7 +129,7 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   stop->setAccessibleName(QObject::tr("Stop scan"));
   stop->setToolTip(QObject::tr("No scan is running."));
   stop->setEnabled(false);
-  stop->setMinimumSize(88, 40);
+  stop->setMinimumSize(88, 30);
   stop->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   buttons->addWidget(stop, 1);
 

@@ -60,7 +60,7 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   auto* layout = new QVBoxLayout(manual);
   layout->setContentsMargins(0, 0, 0, 0);
   outer_layout->addWidget(manual);
-  layout->setSpacing(16);
+  layout->setSpacing(10);
 
   auto* connection = new QHBoxLayout();
   connection->setSpacing(12);

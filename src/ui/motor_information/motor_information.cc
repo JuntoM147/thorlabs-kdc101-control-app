@@ -19,7 +19,7 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
 
   auto* layout = new QGridLayout(section);
   layout->setHorizontalSpacing(16);
-  layout->setVerticalSpacing(14);
+  layout->setVerticalSpacing(6);
   layout->setColumnStretch(3, 1);
   layout->setColumnStretch(4, 2);
   layout->setColumnStretch(5, 1);

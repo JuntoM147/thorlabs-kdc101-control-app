@@ -21,7 +21,7 @@ namespace ui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
-  resize(1200, 700);
+  resize(1200, 640);
   // Temporary scan defaults until calibration/exposure controls are introduced.
   scan_configuration_.pixel_size_mm = 0.0001;  // 0.1 micrometres per pixel.
   scan_configuration_.exposure_time = std::chrono::milliseconds(10);
@@ -38,7 +38,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       border: 1px solid #dce3ed;
       border-radius: 8px;
       margin-top: 12px;
-      padding: 10px 8px 8px;
+      padding: 6px 8px 4px;
       font-size: 14px;
       font-weight: 600;
     }
@@ -53,12 +53,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       background: #ffffff;
       border: 1px solid #cfd8e5;
       border-radius: 5px;
-      padding: 5px 10px;
+      padding: 3px 10px;
       min-height: 18px;
     }
     QPushButton:hover { background: #edf4ff; border-color: #80b3ff; }
     QPushButton:pressed { background: #dceaff; }
-    QPushButton:focus { border: 2px solid #126bf0; padding: 4px 9px; }
+    QPushButton:focus { border: 2px solid #126bf0; padding: 2px 9px; }
     QPushButton:disabled {
       background: #edf0f4;
       color: #8794a8;
@@ -81,8 +81,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       background: #ffffff;
       border: 1px solid #cfd8e5;
       border-radius: 4px;
-      padding: 5px;
-      min-height: 20px;
+      padding: 3px 5px;
+      min-height: 18px;
     }
     QLineEdit:focus, QDoubleSpinBox:focus, QSpinBox:focus { border-color: #126bf0; }
     QLineEdit:read-only { background: #f0f4f9; color: #52627c; }
@@ -101,14 +101,14 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     }
     QProgressBar::chunk { background: #126bf0; border-radius: 3px; }
     QGroupBox#motorControls, QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
-      padding: 4px;
+      padding: 2px 4px;
       margin-top: 12px;
     }
     QLabel#axisFieldLabel { color: #52627c; font-size: 12px; }
-    QGroupBox#motorControls QPushButton { padding: 3px 8px; }
-    QGroupBox#motorControls QPushButton:focus { padding: 2px 7px; }
+    QGroupBox#motorControls QPushButton { padding: 2px 8px; }
+    QGroupBox#motorControls QPushButton:focus { padding: 1px 7px; }
     QGroupBox#motorControls QLineEdit, QGroupBox#motorControls QDoubleSpinBox {
-      padding: 2px 5px;
+      padding: 1px 5px;
     }
     QGroupBox#motorControls QLineEdit:disabled, QGroupBox#motorControls QComboBox:disabled {
       background: #f3f5f8;
@@ -137,13 +137,13 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   auto* central_widget = new QWidget(this);
 
   auto* layout = new QHBoxLayout(central_widget);
-  layout->setContentsMargins(12, 12, 12, 12);
+  layout->setContentsMargins(12, 6, 12, 6);
   layout->setSpacing(12);
 
   auto* left_column = new QWidget(central_widget);
   auto* left_layout = new QVBoxLayout(left_column);
   left_layout->setContentsMargins(0, 0, 0, 0);
-  left_layout->setSpacing(12);
+  left_layout->setSpacing(6);
   left_layout->addWidget(CreateMotorControlSection(*this, left_column), 1);
   left_layout->addWidget(CreateMotorInformationSection(*this, left_column));
   layout->addWidget(left_column, 2);
@@ -151,12 +151,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   auto* right_column = new QWidget(central_widget);
   auto* right_layout = new QVBoxLayout(right_column);
   right_layout->setContentsMargins(0, 0, 0, 0);
-  right_layout->setSpacing(12);
+  right_layout->setSpacing(6);
   auto* upper = new QHBoxLayout();
   upper->setSpacing(12);
   upper->addWidget(CreateImageSection(*this, right_column), 3);
   auto* side = new QVBoxLayout();
-  side->setSpacing(12);
+  side->setSpacing(6);
   side->addWidget(CreateStatusSection(*this, right_column));
   side->addWidget(CreateLaserControlSection(*this, right_column), 1);
   upper->addLayout(side, 2);
