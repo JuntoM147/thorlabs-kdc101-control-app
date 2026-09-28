@@ -49,7 +49,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   header->addWidget(indicator);
   auto* status = new QLabel(QObject::tr("Disconnected"), section);
   status->setAccessibleName(QObject::tr("%1 axis connection status").arg(axis));
-  status->setStyleSheet("color: #52627c; font-size: 14px;");
+  status->setStyleSheet("color: #52627c; font-size: 13px;");
   header->addWidget(status);
   layout->addLayout(header);
 
@@ -71,7 +71,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   readout->setSpacing(6);
   auto* position = new QLabel(QStringLiteral("--"), section);
   position->setAccessibleName(QObject::tr("%1 axis current position").arg(axis));
-  position->setStyleSheet("font-size: 24px; font-weight: 600;");
+  position->setStyleSheet("font-size: 22px; font-weight: 600;");
   position->setToolTip(QObject::tr("Position is unavailable until the motor is connected."));
   readout->addWidget(position);
   readout->addWidget(new QLabel(QObject::tr("mm"), section), 0, Qt::AlignBottom);
@@ -179,21 +179,32 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   inputs->addWidget(new QLabel(QObject::tr("mm"), section), 3, 1);
   step_size->setEnabled(false);
 
-  auto* apply_step = CreateCommandButton(QObject::tr("Apply"), section);
-  apply_step->setAccessibleName(QObject::tr("Apply %1 axis jog step").arg(axis));
-  inputs->addWidget(apply_step, 3, 2);
-  step_size->setToolTip(QObject::tr("Choose a step in mm, then click Apply. Jog uses the applied device settings."));
-  QObject::connect(apply_step, &QPushButton::clicked, section, [&view, axis_id, step_size] {
+  struct SubmittedSettings {
+    std::optional<double> step = application::kDefaultJogStepMm;
+    std::optional<double> speed = application::kDefaultSpeedMmPerSecond;
+    bool pending_step = false;
+    bool pending_speed = false;
+  };
+  const auto submitted = std::make_shared<SubmittedSettings>();
+  step_size->setToolTip(QObject::tr("Selecting a preset applies it immediately. For a custom step in mm, press Enter or leave the field."));
+  const auto submit_step = [&view, axis_id, axis, step_size, submitted] {
+    if (!step_size->isEnabled() || submitted->pending_step) return;
     bool ok = false;
     const double step = QLocale::c().toDouble(step_size->currentText(), &ok);
     if (!ok || !step_size->lineEdit()->hasAcceptableInput() || step <= 0) {
       view.ShowError({axis_id, "Configure jog", "Enter a positive step size in mm."}); return;
     }
+    if (submitted->step == step) return;
+    submitted->step = step;
+    submitted->pending_step = true;
     application::MotorSettings settings;
     settings.jog_step_mm = step;
     settings.jog_mode = application::JogMode::kSingleStep;
+    view.ShowMessage(QObject::tr("%1 axis: applying step size...").arg(axis));
     emit view.ConfigureAxisRequested(axis_id, settings);
-  });
+  };
+  QObject::connect(step_size, &QComboBox::activated, section, [submit_step](int) { submit_step(); });
+  QObject::connect(step_size->lineEdit(), &QLineEdit::editingFinished, section, submit_step);
   add_field_label(QObject::tr("Speed"), 4);
   auto* speed = new QLineEdit(QString::number(application::kDefaultSpeedMmPerSecond), section);
   auto* speed_validator = new QDoubleValidator(0.000001, 1000000.0, 6, speed);
@@ -205,27 +216,27 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
   speed->setAlignment(Qt::AlignRight);
   speed->setEnabled(false);
   speed->setAccessibleName(QObject::tr("%1 axis speed in mm per second").arg(axis));
-  speed->setToolTip(QObject::tr("Apply speed to moves, jogging and homing. Acceleration is unchanged."));
+  speed->setToolTip(QObject::tr("Press Enter or leave the field to apply speed to moves, jogging and homing."));
   inputs->addWidget(speed, 5, 0);
   inputs->addWidget(new QLabel(QObject::tr("mm/s"), section), 5, 1);
-  auto* apply_speed = CreateCommandButton(QObject::tr("Apply"), section);
-  apply_speed->setAccessibleName(QObject::tr("Apply %1 axis speed").arg(axis));
-  inputs->addWidget(apply_speed, 5, 2);
-  QObject::connect(apply_speed, &QPushButton::clicked, section, [&view, axis_id, speed] {
+  QObject::connect(speed, &QLineEdit::editingFinished, section, [&view, axis_id, axis, speed, submitted] {
+    if (!speed->isEnabled() || submitted->pending_speed) return;
     bool ok = false;
     const double value = QLocale::c().toDouble(speed->text(), &ok);
     if (!ok || !speed->hasAcceptableInput() || value <= 0) {
       view.ShowError({axis_id, "Configure speed", "Enter a positive speed in mm/s."}); return;
     }
+    if (submitted->speed == value) return;
+    submitted->speed = value;
+    submitted->pending_speed = true;
     application::MotorSettings settings;
     settings.move.speed_mm_per_second = value;
     settings.jog.speed_mm_per_second = value;
     settings.homing_speed_mm_per_second = value;
+    view.ShowMessage(QObject::tr("%1 axis: applying speed...").arg(axis));
     emit view.ConfigureAxisRequested(axis_id, settings);
   });
-  for (auto* button : {go_button, apply_step, apply_speed}) {
-    button->setFixedWidth(94);
-  }
+  go_button->setFixedWidth(94);
   auto jog = [&view, axis_id](application::Direction direction) {
     emit view.JogAxisRequested(axis_id, direction);
   };
@@ -245,7 +256,7 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
     emit view.MoveAxisRequested(axis_id, absolute_position->value());
   });
   go_button->setAccessibleName(QObject::tr("Move %1 axis").arg(axis));
-  for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, stop, go_button, apply_step, apply_speed}) {
+  for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, stop, go_button}) {
     button->setToolTip(QString());
   }
   jog_down->setToolTip(QObject::tr("Jog one applied step in the negative direction."));
@@ -262,14 +273,39 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
     const auto& state = availability->state;
     const bool connected = state.connection == application::ConnectionState::kConnected;
     const bool ready = connected && state.operation == application::OperationState::kIdle && !availability->pending;
-    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button, apply_step, apply_speed}) {
+    for (auto* button : {jog_up, jog_down, drive_up, drive_down, home, go_button}) {
       button->setEnabled(ready);
     }
     stop->setEnabled(connected && !availability->stopping && state.operation != application::OperationState::kStopping);
     absolute_position->setEnabled(ready);
     step_size->setEnabled(ready);
     speed->setEnabled(ready);
+    const bool applying = availability->pending && (submitted->pending_step || submitted->pending_speed);
+    status->setText(ConnectionText(state.connection) + " / " +
+        (applying ? QObject::tr("Applying settings...") : OperationText(state.operation)));
   };
+  QObject::connect(&view, &MainWindow::AxisSettingsApplied, section,
+                   [=](application::Axis axis, application::MotorSettings settings) {
+    if (axis != axis_id) return;
+    if (settings.jog_step_mm) {
+      submitted->step = settings.jog_step_mm;
+      submitted->pending_step = false;
+      step_size->setCurrentText(QString::number(*settings.jog_step_mm, 'g', 12));
+    }
+    if (settings.move.speed_mm_per_second) {
+      submitted->speed = settings.move.speed_mm_per_second;
+      submitted->pending_speed = false;
+      speed->setText(QString::number(*settings.move.speed_mm_per_second, 'g', 12));
+    }
+    refresh();
+  });
+  QObject::connect(&view, &MainWindow::OperationErrorReported, section, [=](application::OperationError error) {
+    // A failed submission must be retryable even if the entered value is unchanged.
+    if (error.axis != axis_id || availability->pending) return;
+    if (submitted->pending_step) submitted->step.reset();
+    if (submitted->pending_speed) submitted->speed.reset();
+    submitted->pending_step = submitted->pending_speed = false;
+  });
   QObject::connect(&view, &MainWindow::AxisRequestsPending, section,
                    [=](application::Axis axis, bool pending, bool stopping) {
     if (axis != axis_id) return;
@@ -283,13 +319,13 @@ QWidget* CreateAxisControl(MainWindow& view, application::Axis axis_id, const QS
         availability->state.connection != application::ConnectionState::kConnected) {
       step_size->setCurrentText(QString::number(application::kDefaultJogStepMm));
       speed->setText(QString::number(application::kDefaultSpeedMmPerSecond));
+      *submitted = SubmittedSettings{};
     }
     availability->state = state;
     refresh();
     const bool connected = state.connection == application::ConnectionState::kConnected;
     position->setText(connected && state.position_mm ? QString::number(*state.position_mm, 'f', 3) : QStringLiteral("--"));
     position->setToolTip(QString());
-    status->setText(ConnectionText(state.connection) + " / " + OperationText(state.operation));
     indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 4px;"
                                       : "background: #ed1735; border-radius: 4px;");
   });

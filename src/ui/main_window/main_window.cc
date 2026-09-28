@@ -21,7 +21,7 @@ namespace ui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
-  setFixedSize(720, 840);
+  setFixedSize(680, 780);
   // Initial values, with pixel size editable in the Laser tab.
   scan_configuration_.pixel_size_mm = 0.00025;  // 0.25 micrometres per pixel.
   scan_configuration_.exposure_time = std::chrono::milliseconds(10);
@@ -31,7 +31,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       background: #f7f9fc;
       color: #14233f;
       font-family: "Segoe UI";
-      font-size: 14px;
+      font-size: 13px;
     }
     QGroupBox {
       background: #ffffff;
@@ -39,7 +39,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       border-radius: 8px;
       margin-top: 12px;
       padding: 6px 8px 4px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
     }
     QGroupBox::title {
@@ -104,7 +104,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       padding: 2px 4px;
       margin-top: 12px;
     }
-    QLabel#axisFieldLabel { color: #52627c; font-size: 14px; }
+    QLabel#axisFieldLabel { color: #52627c; font-size: 13px; }
     QGroupBox#motorControls QPushButton { padding: 2px 8px; }
     QGroupBox#motorControls QPushButton:focus { padding: 1px 7px; }
     QGroupBox#motorControls QLineEdit, QGroupBox#motorControls QDoubleSpinBox {
@@ -115,7 +115,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       color: #8794a8;
     }
     QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
-      font-size: 14px;
+      font-size: 13px;
     }
     QGroupBox#motorControls QPushButton#axisStop {
       color: #b42338;
@@ -327,6 +327,7 @@ void MainWindow::ShowMessage(const QString& message, bool error) {
 }
 
 void MainWindow::ShowError(application::OperationError error) {
+  emit OperationErrorReported(error);
   const QString axis = error.axis
       ? tr("Axis %1: ").arg(QStringList{"X", "Y", "Z"}.at(static_cast<int>(*error.axis)))
       : QString();

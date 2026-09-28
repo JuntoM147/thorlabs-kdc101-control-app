@@ -63,6 +63,7 @@ class MainWindow : public QMainWindow {
 
   // Broadcast application observations to the display sections.
   void StatusMessageChanged(const QString& message, bool error);
+  void OperationErrorReported(application::OperationError error);
   void AxisSettingsApplied(application::Axis axis, application::MotorSettings settings);
   void AxisStateUpdated(application::AxisState state);
   void AxisRequestsPending(application::Axis axis, bool pending, bool stopping);
