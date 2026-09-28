@@ -27,6 +27,7 @@ Application::Application(QObject* parent) : QObject(parent) {
     connect(motor, &MotorController::RequestCompleted, this, &Application::OnWorkerCompleted);
     connect(motor, &MotorController::RequestFailed, this, &Application::OnWorkerFailed);
     connect(motor, &MotorController::RequestCancelled, this, &Application::OnWorkerCancelled);
+    connect(motor, &MotorController::PositionWarning, this, &Application::PositionWarning);
   }
   laser_ = std::make_unique<LaserController>();
   connect(laser_.get(), &LaserController::StateChanged, this, [this](LaserState state) {

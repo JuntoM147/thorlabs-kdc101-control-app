@@ -280,8 +280,7 @@ void MotorWorker::PollDevice() {
   std::optional<int> done;
   std::optional<int> cancelled;
   std::optional<int> stop;
-  std::optional<int> failed;
-  std::optional<OperationError> position_error;
+  std::optional<OperationError> position_warning;
   if (relative_move_check_) {
     if (completed && !relative_move_check_->completed_since.isValid())
       relative_move_check_->completed_since.start();
@@ -299,14 +298,14 @@ void MotorWorker::PollDevice() {
       if (!reached && check.completed_since.elapsed() >= grace_ms) {
         std::ostringstream message;
         message << std::fixed << std::setprecision(6)
-                << "Scan stopped: motor completed at an unexpected position. Requested travel "
+                << "Position mismatch; scan continues. Requested travel "
                 << check.distance_mm << " mm; observed travel " << *position - check.start_mm
                 << " mm. Start " << check.start_mm << " mm; expected " << expected
                 << " mm; actual " << *position << " mm; tolerance " << check.tolerance_mm
                 << " mm. Position samples: "
                 << QDir::toNativeSeparators(QDir::temp().filePath("confo-quanta-position.csv")).toStdString();
-        position_error = OperationError{axis_, "Scan position check", message.str()};
-        failed = std::exchange(active_request_, {});
+        position_warning = OperationError{axis_, "Scan position check", message.str()};
+        completed = true;
       }
     }
   }
@@ -317,8 +316,8 @@ void MotorWorker::PollDevice() {
     if (stopped) cancelled = std::exchange(active_request_, {});
     else done = std::exchange(active_request_, {});
   }
-  if (relative_move_check_ && (failed || done || cancelled))
-    TracePosition(failed ? "failed" : (cancelled ? "cancelled" : "passed"), timestamp, *position, Moving(*status));
+  if (relative_move_check_ && (done || cancelled))
+    TracePosition(position_warning ? "warning" : (cancelled ? "cancelled" : "passed"), timestamp, *position, Moving(*status));
   if (!active_request_ && !stop_request_) {
     operation_ = OperationState::kIdle;
     relative_move_check_.reset();
@@ -339,7 +338,7 @@ void MotorWorker::PollDevice() {
   observation.hardware_moving = Moving(*status);
   observation.channel_enabled = status->channel_enabled;
   emit StateChanged(observation);
-  if (failed) emit RequestFailed(*failed, *position_error);
+  if (position_warning) emit PositionWarning(*position_warning);
   if (cancelled) emit RequestCancelled(*cancelled);
   if (done) emit RequestCompleted(*done);
   if (stop) emit RequestCompleted(*stop);

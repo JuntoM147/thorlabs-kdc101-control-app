@@ -69,6 +69,7 @@ class Application : public QObject {
   void ScanStateUpdated(application::ScanState state);
   void ScanResetCompleted();
   void RequestFailed(application::OperationError error);
+  void PositionWarning(application::OperationError warning);
 
 // Internal functions to handle worker signals
  private slots:

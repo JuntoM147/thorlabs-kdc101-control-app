@@ -24,7 +24,15 @@ QWidget* CreateStatusSection(MainWindow& view, QWidget* parent) {
                    [message](const QString& text, bool error) {
     message->setText(text);
     message->setProperty("error", error);
+    message->setProperty("warning", false);
     message->setStyleSheet(error ? "color: #b42338;" : "color: #00843b;");
+  });
+  QObject::connect(&view, &MainWindow::StatusWarningChanged, section,
+                   [message](const QString& text) {
+    message->setText(text);
+    message->setProperty("error", false);
+    message->setProperty("warning", true);
+    message->setStyleSheet("color: #a66300;");
   });
 
   return section;

@@ -19,6 +19,7 @@ void MotorController::EnsureWorkerStarted() {
   worker_->moveToThread(&thread_);
   connect(&thread_, &QThread::finished, worker_, &QObject::deleteLater);
   connect(worker_, &MotorWorker::StateChanged, this, &MotorController::StateChanged);
+  connect(worker_, &MotorWorker::PositionWarning, this, &MotorController::PositionWarning);
   connect(worker_, &MotorWorker::RequestAccepted, this, [this](int id) {
     if (id > 0) emit RequestAccepted(id);
   });

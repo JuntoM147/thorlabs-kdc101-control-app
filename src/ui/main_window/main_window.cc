@@ -313,11 +313,13 @@ void MainWindow::SetPixelSizeMicrometres(double value) {
 
 void MainWindow::RequestScan() {
   if (!CanStartScan()) return;
+  position_warning_visible_ = false;
   emit StartScanRequested(scan_configuration_);
 }
 
 void MainWindow::UpdateScanState(application::ScanState state) {
   scan_state_ = state;
+  if (state.phase == application::ScanPhase::kWaiting) position_warning_visible_ = false;
   if (state.phase != application::ScanPhase::kIdle) scan_has_run_ = true;
   emit ScanDisplayChanged(state);
   emit ScanAvailabilityChanged();
@@ -330,10 +332,12 @@ bool MainWindow::CanResetScan() const {
 }
 void MainWindow::RequestResetScan() {
   if (!CanResetScan()) return;
+  position_warning_visible_ = false;
   ShowMessage(tr("Resetting: turning laser OFF and stopping motors..."));
   emit ResetScanRequested();
 }
 void MainWindow::OnScanResetCompleted() {
+  position_warning_visible_ = false;
   scan_has_run_ = false;
   ResetRoute();
   emit ScanAvailabilityChanged();
@@ -341,7 +345,18 @@ void MainWindow::OnScanResetCompleted() {
 }
 
 void MainWindow::ShowMessage(const QString& message, bool error) {
+  // Keep the warning visible through routine polling/scan completion messages.
+  if (position_warning_visible_ && !error) return;
+  if (error) position_warning_visible_ = false;
   emit StatusMessageChanged(message, error);
+}
+
+void MainWindow::ShowWarning(application::OperationError warning) {
+  position_warning_visible_ = true;
+  const QString axis = warning.axis
+      ? tr("Axis %1: ").arg(QStringList{"X", "Y", "Z"}.at(static_cast<int>(*warning.axis)))
+      : QString();
+  emit StatusWarningChanged(tr("Warning — ") + axis + QString::fromStdString(warning.message));
 }
 
 void MainWindow::ShowError(application::OperationError error) {

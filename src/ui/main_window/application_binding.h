@@ -36,6 +36,7 @@ void BindApplication(MainWindow& view, Application& application) {
   QObject::connect(&application, &Application::ControlsLocked, &view, &MainWindow::SetControlsLocked);
   QObject::connect(&application, &Application::ScanStateUpdated, &view, &MainWindow::UpdateScanState);
   QObject::connect(&application, &Application::RequestFailed, &view, &MainWindow::ShowError);
+  QObject::connect(&application, &Application::PositionWarning, &view, &MainWindow::ShowWarning);
   QObject::connect(&application, &QObject::destroyed, &view, [&view] { view.SetBackendAvailable(false); });
   view.SetBackendAvailable(true);
   view.SetManualRequestsPending(application.HasPendingManualRequests());

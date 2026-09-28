@@ -42,6 +42,7 @@ class MainWindow : public QMainWindow {
   void UpdateScanState(application::ScanState state);
   void ShowMessage(const QString& message, bool error = false);
   void ShowError(application::OperationError error);
+  void ShowWarning(application::OperationError warning);
   void RequestScan();
   void RequestResetScan();
   void OnScanResetCompleted();
@@ -67,6 +68,7 @@ class MainWindow : public QMainWindow {
 
   // Broadcast application observations to the display sections.
   void StatusMessageChanged(const QString& message, bool error);
+  void StatusWarningChanged(const QString& message);
   void OperationErrorReported(application::OperationError error);
   void AxisSettingsApplied(application::Axis axis, application::MotorSettings settings);
   void AxisStateUpdated(application::AxisState state);
@@ -92,6 +94,7 @@ class MainWindow : public QMainWindow {
   bool has_pattern_ = false;
   bool start_pixel_set_ = false;
   bool scan_has_run_ = false;
+  bool position_warning_visible_ = false;
   QSize scan_image_size_;
   algo::Program preview_program_;
   application::ScanConfiguration scan_configuration_;

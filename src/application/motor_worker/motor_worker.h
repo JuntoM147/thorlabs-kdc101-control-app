@@ -41,6 +41,7 @@ class MotorWorker : public QObject {
   void RequestAccepted(int id);
   void RequestCompleted(int id);
   void RequestFailed(int id, application::OperationError error);
+  void PositionWarning(application::OperationError warning);
   void RequestCancelled(int id);
   void ShutdownReady(application::Axis axis);
 

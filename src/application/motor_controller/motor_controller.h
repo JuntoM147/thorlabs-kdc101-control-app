@@ -46,6 +46,7 @@ class MotorController : public QObject {
   void RequestAccepted(int id);
   void RequestCompleted(int id);
   void RequestFailed(int id, application::OperationError error);
+  void PositionWarning(application::OperationError warning);
   void RequestCancelled(int id);
 
   // Only private scan IDs produce these signals, once the operation has settled.
