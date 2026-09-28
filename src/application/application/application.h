@@ -23,6 +23,7 @@ class Application : public QObject {
  public:
   explicit Application(QObject* parent = nullptr);
   ~Application() override;
+  bool UsesSimulatedMotors() const { return simulation_->IsSimulation(); }
   bool HasPendingAxisRequest(Axis axis) const {
     const auto i = static_cast<unsigned>(axis);
     return i < 3 && (axis_requests_[i] || axis_stops_[i]);
@@ -95,6 +96,7 @@ class Application : public QObject {
 
   std::array<ConnectionState, 3> motor_connections_{};
   std::array<OperationState, 3> motor_operations_{};
+  std::array<std::optional<bool>, 3> motor_homed_{};
   std::optional<bool> laser_output_;
   ConnectionState laser_connection_ = ConnectionState::kDisconnected;
   // Outlives every motor and its worker thread. All axes share one SDK session.

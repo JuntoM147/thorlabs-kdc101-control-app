@@ -77,6 +77,9 @@ class ScanController : public QObject {
   ScanState state_;  // Phase and progress; completed_instructions is the index.
   std::size_t substep_ = 0;  // X then Y, or the next stop/OFF operation.
   std::optional<Device> pending_device_;  // Device whose result we await.
+  std::array<AxisState, 3> observations_{};
+  std::optional<double> pending_start_position_;
+  std::optional<double> pending_distance_;
   QTimer* exposure_timer_ = nullptr;  // QObject child, finishes a timed instruction
   QTimer* operation_timer_ = nullptr;  // QObject child, detects missing device replies
 

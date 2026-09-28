@@ -83,6 +83,10 @@ void MotorWorker::BeginMotion(int id, OperationState operation,
                                                       : observed.error().error_message()});
     return;
   }
+  if (operation == OperationState::kMoving && !observed->homed) {
+    emit RequestFailed(id, {axis_, "Move", "Home this axis before requesting a positioning move."});
+    return;
+  }
   auto result = motor_->ClearMessageQueue();
   if (result.ok()) result = start();
   if (!result.ok()) {
@@ -93,7 +97,7 @@ void MotorWorker::BeginMotion(int id, OperationState operation,
   operation_ = operation;
   emit RequestAccepted(id);
   if (id > 0 && operation != OperationState::kDriving) {
-    QTimer::singleShot(60000, this, [this, id] {
+    QTimer::singleShot(kDefaultMotionTimeout, this, [this, id] {
       if (active_request_ == id) FailDevice({axis_, "Motion", "Timed out waiting for completion."});
     });
   }
@@ -244,6 +248,8 @@ void MotorWorker::PollDevice() {
   observation.homed = status->homed;
   observation.forward_limit = status->forward_limit_switch;
   observation.reverse_limit = status->reverse_limit_switch;
+  observation.hardware_moving = Moving(*status);
+  observation.channel_enabled = status->channel_enabled;
   emit StateChanged(observation);
   if (cancelled) emit RequestCancelled(*cancelled);
   if (done) emit RequestCompleted(*done);

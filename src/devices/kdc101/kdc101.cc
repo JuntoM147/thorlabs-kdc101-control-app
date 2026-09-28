@@ -365,6 +365,8 @@ DeviceStatus KDC101::StartMoveRelative(double distance)
         return conversion_status;
     }
 
+    // A zero displacement may never produce the completion event the worker awaits.
+    if (device_units == 0) return DeviceStatus::MotionBelowResolution(serial_number_);
     return DeviceStatus::FromKinesis(CC_MoveRelative(serial_number_.c_str(), device_units));
 }
 

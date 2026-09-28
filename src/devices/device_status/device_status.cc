@@ -158,6 +158,13 @@ DeviceStatus DeviceStatus::NotConnected(const std::string& serial_number)
                         "Device with serial number " + serial_number + " not connected");
 }
 
+DeviceStatus DeviceStatus::MotionBelowResolution(const std::string& serial_number)
+{
+    return DeviceStatus(DeviceStatusCode::kMotionResolutionError, std::nullopt,
+                        "Relative move converts to zero device units for " + serial_number +
+                        ". Check the pixel size and loaded stage profile.");
+}
+
 DeviceStatus DeviceStatus::Timeout(const std::string& serial_number, int expected_message)
 {
     return DeviceStatus(DeviceStatusCode::kTimeout,

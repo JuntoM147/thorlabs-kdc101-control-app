@@ -77,6 +77,7 @@ class MainWindow : public QMainWindow {
   std::array<application::ConnectionState, 3> motor_connections_{};
   application::ConnectionState laser_connection_ = application::ConnectionState::kDisconnected;
   std::array<application::OperationState, 3> motor_operations_{};
+  std::array<std::optional<bool>, 3> motor_homed_{};
   std::optional<bool> laser_output_;
   bool manual_requests_pending_ = false;
   bool backend_available_ = false;

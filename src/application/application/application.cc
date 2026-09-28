@@ -21,6 +21,7 @@ Application::Application(QObject* parent) : QObject(parent) {
     connect(motor, &MotorController::StateChanged, this, [this, i](AxisState state) {
       motor_connections_[i] = state.connection;
       motor_operations_[i] = state.operation;
+      motor_homed_[i] = state.homed;
       emit AxisStateUpdated(state);
     });
     connect(motor, &MotorController::RequestCompleted, this, &Application::OnWorkerCompleted);
@@ -134,6 +135,8 @@ std::optional<OperationError> Application::ScanReadinessError() const {
       return OperationError{static_cast<Axis>(i), "Start scan", "Connect all three motors before starting a scan."};
     if (motor_operations_[i] != OperationState::kIdle)
       return OperationError{static_cast<Axis>(i), "Start scan", "Wait until all axes are idle."};
+    if (i < 2 && !motor_homed_[i].value_or(false))
+      return OperationError{static_cast<Axis>(i), "Start scan", "Home this axis before starting a scan."};
   }
   if (laser_connection_ != ConnectionState::kConnected)
     return OperationError{{}, "Start scan", "Connect the laser before starting a scan."};

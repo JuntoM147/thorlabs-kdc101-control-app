@@ -21,7 +21,7 @@ namespace ui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
-  resize(1400, 900);
+  resize(1200, 700);
   // Temporary scan defaults until calibration/exposure controls are introduced.
   scan_configuration_.pixel_size_mm = 0.0001;  // 0.1 micrometres per pixel.
   scan_configuration_.exposure_time = std::chrono::milliseconds(10);
@@ -31,15 +31,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       background: #f7f9fc;
       color: #14233f;
       font-family: "Segoe UI";
-      font-size: 13px;
+      font-size: 12px;
     }
     QGroupBox {
       background: #ffffff;
       border: 1px solid #dce3ed;
       border-radius: 8px;
-      margin-top: 14px;
-      padding: 14px 10px 10px;
-      font-size: 16px;
+      margin-top: 12px;
+      padding: 10px 8px 8px;
+      font-size: 14px;
       font-weight: 600;
     }
     QGroupBox::title {
@@ -53,12 +53,12 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       background: #ffffff;
       border: 1px solid #cfd8e5;
       border-radius: 5px;
-      padding: 7px 14px;
-      min-height: 20px;
+      padding: 5px 10px;
+      min-height: 18px;
     }
     QPushButton:hover { background: #edf4ff; border-color: #80b3ff; }
     QPushButton:pressed { background: #dceaff; }
-    QPushButton:focus { border: 2px solid #126bf0; padding: 6px 13px; }
+    QPushButton:focus { border: 2px solid #126bf0; padding: 4px 9px; }
     QPushButton:disabled {
       background: #edf0f4;
       color: #8794a8;
@@ -115,7 +115,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
       color: #8794a8;
     }
     QGroupBox#axisX, QGroupBox#axisY, QGroupBox#axisZ {
-      font-size: 13px;
+      font-size: 12px;
     }
     QGroupBox#motorControls QPushButton#axisStop {
       color: #b42338;
@@ -137,8 +137,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   auto* central_widget = new QWidget(this);
 
   auto* layout = new QHBoxLayout(central_widget);
-  layout->setContentsMargins(16, 16, 16, 16);
-  layout->setSpacing(16);
+  layout->setContentsMargins(12, 12, 12, 12);
+  layout->setSpacing(12);
 
   auto* left_column = new QWidget(central_widget);
   auto* left_layout = new QVBoxLayout(left_column);
@@ -167,9 +167,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   connect(this, &MainWindow::AxisStateUpdated, this, [this](application::AxisState state) {
     const auto index = static_cast<std::size_t>(state.axis);
     if (index >= motor_connections_.size()) return;
-    if (motor_connections_[index] == state.connection && motor_operations_[index] == state.operation) return;
+    if (motor_connections_[index] == state.connection && motor_operations_[index] == state.operation &&
+        motor_homed_[index] == state.homed) return;
     motor_connections_[index] = state.connection;
     motor_operations_[index] = state.operation;
+    motor_homed_[index] = state.homed;
     emit ScanAvailabilityChanged();
   });
   connect(this, &MainWindow::LaserStateUpdated, this, [this](application::LaserState state) {
@@ -192,6 +194,7 @@ void MainWindow::SetBackendAvailable(bool available) {
     motor_connections_.fill(application::ConnectionState::kDisconnected);
     laser_connection_ = application::ConnectionState::kDisconnected;
     motor_operations_.fill(application::OperationState::kIdle);
+    motor_homed_.fill(std::nullopt);
     laser_output_.reset();
     manual_requests_pending_ = false;
   }
@@ -284,6 +287,8 @@ QStringList MainWindow::ScanStartBlockers() const {
       reasons << tr("Connect the %1 motor.").arg(axes.at(i));
     else if (motor_operations_[i] != application::OperationState::kIdle)
       reasons << tr("Wait until the %1 axis is idle.").arg(axes.at(i));
+    else if (i < 2 && !motor_homed_[i].value_or(false))
+      reasons << tr("Home the %1 axis before starting a scan.").arg(axes.at(i));
   }
   if (laser_connection_ != application::ConnectionState::kConnected)
     reasons << tr("Connect the laser.");

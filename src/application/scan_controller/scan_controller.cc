@@ -3,6 +3,8 @@
 #include <climits>
 #include <cmath>
 #include <exception>
+#include <iomanip>
+#include <sstream>
 #include <utility>
 
 #include "../../algo/algorithm/algorithm.h"
@@ -19,6 +21,9 @@ ScanController::ScanController(MotorController& x, MotorController& y, MotorCont
   connect(operation_timer_, &QTimer::timeout, this, &ScanController::OnOperationTimedOut);
   for (auto& reference : motors_) {
     auto* motor = &reference.get();
+    connect(motor, &MotorController::StateChanged, this, [this](AxisState state) {
+      observations_[static_cast<std::size_t>(state.axis)] = state;
+    });
     connect(motor, &MotorController::ScanOperationCompleted, this, &ScanController::OnMotorCompleted);
     connect(motor, &MotorController::ScanOperationFailed, this, &ScanController::OnMotorFailed);
     connect(motor, &MotorController::ScanOperationCancelled, this, &ScanController::OnMotorCancelled);
@@ -75,6 +80,9 @@ void ScanController::Start() {
 }
 void ScanController::AwaitDevice(Device device) {
   pending_device_ = device;
+  pending_distance_.reset();
+  pending_start_position_ = device == Device::kLaser ? std::nullopt
+      : observations_[static_cast<std::size_t>(device)].position_mm;
   operation_timer_->start(static_cast<int>(configuration_.motion_timeout.count()));
 }
 void ScanController::ContinueStopAndOff() {
@@ -130,6 +138,7 @@ void ScanController::ExecuteNextInstruction() {
       substep_ = 1;
       if (move->dx != 0) {
         AwaitDevice(Device::kX);
+        pending_distance_ = move->dx * configuration_.pixel_size_mm;
         motors_[0].get().MoveRelativeForScan(move->dx * configuration_.pixel_size_mm);
         return;
       }
@@ -138,6 +147,7 @@ void ScanController::ExecuteNextInstruction() {
       substep_ = 2;
       if (move->dy != 0) {
         AwaitDevice(Device::kY);
+        pending_distance_ = move->dy * configuration_.pixel_size_mm;
         motors_[1].get().MoveRelativeForScan(move->dy * configuration_.pixel_size_mm);
         return;
       }
@@ -284,7 +294,31 @@ void ScanController::OnLaserFailed(OperationError error) { OperationFailed(Devic
 void ScanController::OnLaserCancelled() { OperationCancelled(Device::kLaser); }
 void ScanController::OnOperationTimedOut() {
   if (!pending_device_) return;
-  if (!failure_error_) failure_error_ = OperationError{{}, "Scan", "Device operation timed out."};
+  if (!failure_error_) {
+    std::ostringstream message;
+    message << std::fixed << std::setprecision(6)
+            << "No completion confirmation within " << configuration_.motion_timeout.count() / 1000.0
+            << " seconds.";
+    std::optional<Axis> axis;
+    if (*pending_device_ != Device::kLaser) {
+      axis = static_cast<Axis>(*pending_device_);
+      const auto& observation = observations_[static_cast<std::size_t>(*axis)];
+      if (pending_distance_) message << " Requested relative move: " << *pending_distance_ << " mm.";
+      if (pending_start_position_) message << " Start: " << *pending_start_position_ << " mm.";
+      if (observation.position_mm) message << " Last position: " << *observation.position_mm << " mm.";
+      const auto flag = [](std::optional<bool> value) {
+        return value ? (*value ? "yes" : "no") : "unknown";
+      };
+      message << " Hardware moving=" << flag(observation.hardware_moving)
+              << ", homed=" << flag(observation.homed)
+              << ", enabled=" << flag(observation.channel_enabled)
+              << ", forward limit=" << flag(observation.forward_limit)
+              << ", reverse limit=" << flag(observation.reverse_limit) << ".";
+    } else {
+      message << " Waiting for laser output acknowledgement.";
+    }
+    failure_error_ = OperationError{axis, "Scan timeout", message.str()};
+  }
   // Keep the device reserved until its cancellation reply arrives.
   if (state_.phase != ScanPhase::kStopping || !cleanup_started_) {
     FailScan(*failure_error_);

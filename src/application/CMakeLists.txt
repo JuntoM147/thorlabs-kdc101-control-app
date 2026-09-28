@@ -4,7 +4,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     message(FATAL_ERROR "Open the repository-root CMakeLists.txt to build the complete application.")
 endif()
 
-option(APPLICATION_USE_KINESIS_SIMULATION "Use the Kinesis simulator in the application" ON)
+option(APPLICATION_USE_KINESIS_SIMULATION "Use the Kinesis simulator in the application" OFF)
 
 add_library(application STATIC
     application/application.cc application/application.h
@@ -26,6 +26,8 @@ if(BUILD_TESTING AND DEVICES_USE_FAKE_KINESIS AND DEVICES_USE_FAKE_NI_DAQ)
     set_target_properties(application_test PROPERTIES AUTOMOC ON)
     target_include_directories(application_test PRIVATE ../../tests/kdc101/fake_sdk)
     target_link_libraries(application_test PRIVATE application Qt6::Test)
+    target_compile_definitions(application_test PRIVATE
+        EXPECT_KINESIS_SIMULATION=$<BOOL:${APPLICATION_USE_KINESIS_SIMULATION}>)
     add_test(NAME application_test COMMAND application_test)
     set_tests_properties(application_test PROPERTIES TIMEOUT 45)
     if(WIN32)

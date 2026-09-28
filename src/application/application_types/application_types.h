@@ -52,6 +52,7 @@ struct MotorSettings {
 inline constexpr double kDefaultJogStepMm = 0.005;
 inline constexpr double kDefaultSpeedMmPerSecond = 0.08;
 inline constexpr double kDefaultAccelerationMmPerSecondSquared = 1.5;
+inline constexpr std::chrono::milliseconds kDefaultMotionTimeout = std::chrono::minutes(15);
 inline MotorSettings DefaultMotorSettings() {
   MotorSettings settings;
   settings.move = {kDefaultSpeedMmPerSecond, kDefaultAccelerationMmPerSecondSquared};
@@ -69,7 +70,7 @@ struct ScanConfiguration {
   algo::PixelPosition start_pixel;
   double pixel_size_mm = 0.0;  // Must be positive.
   std::chrono::milliseconds exposure_time{0};
-  std::chrono::milliseconds motion_timeout{60000};
+  std::chrono::milliseconds motion_timeout{kDefaultMotionTimeout};
   MotionSettings motion;
 };
 
@@ -89,6 +90,9 @@ struct AxisState {
   std::optional<bool> homed;
   std::optional<bool> forward_limit;
   std::optional<bool> reverse_limit;
+  // Hardware feedback, independent of the application's pending command.
+  std::optional<bool> hardware_moving;
+  std::optional<bool> channel_enabled;
 };
 
 struct LaserState {

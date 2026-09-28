@@ -16,7 +16,8 @@ enum class DeviceStatusCode {
   kConnectionError,
   kTimeout,
   kNiDaqError,
-  kLaserLineConfigurationError
+  kLaserLineConfigurationError,
+  kMotionResolutionError
 };
 
 class DeviceStatus {
@@ -32,6 +33,7 @@ class DeviceStatus {
         static DeviceStatus FailedToStartPolling(const std::string& serial_number);
         static DeviceStatus NotConnected(const std::string& serial_number);
         static DeviceStatus Timeout(const std::string& serial_number, int expected_message);
+        static DeviceStatus MotionBelowResolution(const std::string& serial_number);
 
         ~DeviceStatus() = default;
 
