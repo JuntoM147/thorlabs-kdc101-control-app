@@ -8,15 +8,14 @@
   "configurePresets": [
     {
       "name": "app",
-      "displayName": "Windows application (no tests)",
-      "description": "Build the full application with real device SDKs in a separate build folder.",
+      "displayName": "UI preview and worker header review",
+      "description": "Build the UI preview and check worker declarations; no hardware connection is started.",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build-app",
       "cacheVariables": {
         "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build-app",
         "BUILD_TESTING": "OFF",
-        "APPLICATION_USE_KINESIS_SIMULATION": "OFF",
         "DEVICES_USE_FAKE_KINESIS": "OFF",
         "DEVICES_USE_FAKE_NI_DAQ": "OFF"
       }

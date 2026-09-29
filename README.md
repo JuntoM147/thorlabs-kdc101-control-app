@@ -1,5 +1,6 @@
 # About
-TODO
+
+Qt UI for KDC101 motors, an NI-DAQ laser output, and image-based scan planning.
 
 # Dependencies
 
