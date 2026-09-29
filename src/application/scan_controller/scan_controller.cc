@@ -24,17 +24,17 @@ ScanController::ScanController(MotorController& x, MotorController& y, MotorCont
     connect(motor, &MotorController::StateChanged, this, [this](AxisState state) {
       observations_[static_cast<std::size_t>(state.axis)] = state;
     });
-    connect(motor, &MotorController::ScanOperationCompleted, this, &ScanController::OnMotorCompleted);
-    connect(motor, &MotorController::ScanOperationFailed, this, &ScanController::OnMotorFailed);
-    connect(motor, &MotorController::ScanOperationCancelled, this, &ScanController::OnMotorCancelled);
+    connect(motor, &MotorController::ScanOperationCompleted, this, &ScanController::OnMotorCompleted, Qt::QueuedConnection);
+    connect(motor, &MotorController::ScanOperationFailed, this, &ScanController::OnMotorFailed, Qt::QueuedConnection);
+    connect(motor, &MotorController::ScanOperationCancelled, this, &ScanController::OnMotorCancelled, Qt::QueuedConnection);
     connect(motor, &MotorController::RequestFailed, this, [this](int id, OperationError error) {
       if (id == 0 && state_.phase != ScanPhase::kIdle && state_.phase != ScanPhase::kWaiting &&
           state_.phase != ScanPhase::kFailed) FailScan(error);
     });
   }
-  connect(&laser_, &LaserController::ScanOperationCompleted, this, &ScanController::OnLaserCompleted);
-  connect(&laser_, &LaserController::ScanOperationFailed, this, &ScanController::OnLaserFailed);
-  connect(&laser_, &LaserController::ScanOperationCancelled, this, &ScanController::OnLaserCancelled);
+  connect(&laser_, &LaserController::ScanOperationCompleted, this, &ScanController::OnLaserCompleted, Qt::QueuedConnection);
+  connect(&laser_, &LaserController::ScanOperationFailed, this, &ScanController::OnLaserFailed, Qt::QueuedConnection);
+  connect(&laser_, &LaserController::ScanOperationCancelled, this, &ScanController::OnLaserCancelled, Qt::QueuedConnection);
 }
 ScanController::~ScanController() = default;
 
@@ -62,7 +62,7 @@ std::expected<void, OperationError> ScanController::Configure(ScanConfiguration 
   configuration_ = std::move(configuration);
   program_.clear();
   substep_ = 0;
-  pending_device_.reset();
+  pending_devices_.clear();
   cleanup_started_ = cancelled_ = program_output_enabled_ = false;
   failure_error_.reset();
   state_ = {ScanPhase::kWaiting, 0, 0};
@@ -79,15 +79,24 @@ void ScanController::Start() {
   ContinueStopAndOff();
 }
 void ScanController::AwaitDevice(Device device) {
-  pending_device_ = device;
-  pending_distance_.reset();
-  pending_start_position_ = device == Device::kLaser ? std::nullopt
-      : observations_[static_cast<std::size_t>(device)].position_mm;
-  operation_timer_->start(static_cast<int>(configuration_.motion_timeout.count()));
+  if (pending_devices_.empty())
+    operation_timer_->start(static_cast<int>(configuration_.motion_timeout.count()));
+  pending_devices_.insert(device);
+  const auto index = static_cast<std::size_t>(device);
+  pending_distances_[index].reset();
+  pending_start_positions_[index] = device == Device::kLaser ? std::nullopt
+      : observations_[index].position_mm;
+}
+void ScanController::CancelPendingOperations() {
+  const auto pending = pending_devices_;
+  for (const auto device : pending) {
+    if (device == Device::kLaser) laser_.CancelScanOperation();
+    else motors_[static_cast<int>(device)].get().CancelScanOperation();
+  }
 }
 void ScanController::ContinueStopAndOff() {
   if (state_.phase != ScanPhase::kPreparing && state_.phase != ScanPhase::kStopping) return;
-  if (pending_device_) return;
+  if (!pending_devices_.empty()) return;
   // Configure X and Y once, after all motors have stopped, before any scan move.
   if (state_.phase == ScanPhase::kPreparing && substep_ >= 4 && substep_ < 6) {
     const auto axis = substep_ - 4;
@@ -124,7 +133,7 @@ void ScanController::ContinueStopAndOff() {
   }
 }
 void ScanController::ExecuteNextInstruction() {
-  if (pending_device_ || exposure_timer_->isActive() ||
+  if (!pending_devices_.empty() || exposure_timer_->isActive() ||
       (state_.phase != ScanPhase::kRunning && state_.phase != ScanPhase::kPauseRequested)) return;
   if (state_.completed_instructions == program_.size()) {
     StopMotorsAndTurnOutputOff(); return;
@@ -134,23 +143,27 @@ void ScanController::ExecuteNextInstruction() {
   }
   const auto& instruction = program_[state_.completed_instructions];
   if (const auto* move = std::get_if<algo::MoveRelative>(&instruction)) {
+    if (program_output_enabled_ && (move->dx < 0 || move->dy < 0 ||
+                                    (move->dx != 0 && move->dy != 0))) {
+      FailScan({{}, "Exposure route", "Illuminated moves must use one positive axis. Reverse travel must be laser OFF."});
+      return;
+    }
     if (substep_ == 0) {
       substep_ = 1;
-      if (move->dx != 0) {
-        AwaitDevice(Device::kX);
-        pending_distance_ = move->dx * configuration_.pixel_size_mm;
-        motors_[0].get().MoveRelativeForScan(move->dx * configuration_.pixel_size_mm);
-        return;
+      // Reserve both axes before submitting either command. Terminal replies are
+      // queued, including synchronous dispatch failures, so neither can advance
+      // the instruction before all participants have been submitted.
+      const std::array<int, 2> offsets{move->dx, move->dy};
+      for (std::size_t axis = 0; axis < offsets.size(); ++axis) {
+        if (offsets[axis] == 0) continue;
+        AwaitDevice(static_cast<Device>(axis));
+        pending_distances_[axis] = offsets[axis] * configuration_.pixel_size_mm;
       }
-    }
-    if (substep_ == 1) {
-      substep_ = 2;
-      if (move->dy != 0) {
-        AwaitDevice(Device::kY);
-        pending_distance_ = move->dy * configuration_.pixel_size_mm;
-        motors_[1].get().MoveRelativeForScan(move->dy * configuration_.pixel_size_mm);
-        return;
+      for (std::size_t axis = 0; axis < offsets.size(); ++axis) {
+        if (offsets[axis] != 0)
+          motors_[axis].get().MoveRelativeForScan(*pending_distances_[axis]);
       }
+      if (!pending_devices_.empty()) return;
     }
     FinishInstruction();
   } else if (substep_ != 0) {
@@ -182,7 +195,7 @@ void ScanController::Pause() {
   }
   state_.phase = ScanPhase::kPauseRequested;
   emit StateChanged(state_);
-  if (!pending_device_ && !exposure_timer_->isActive())
+  if (pending_devices_.empty() && !exposure_timer_->isActive())
     QTimer::singleShot(0, this, &ScanController::ExecuteNextInstruction);
 }
 void ScanController::TurnOutputOffForPause() {
@@ -220,15 +233,14 @@ void ScanController::Cancel() {
   state_.total_instructions = 0;
   emit StateChanged(state_);
   exposure_timer_->stop();
-  if (pending_device_) {
-    if (*pending_device_ == Device::kLaser) laser_.CancelScanOperation();
-    else motors_[static_cast<int>(*pending_device_)].get().CancelScanOperation();
+  if (!pending_devices_.empty()) {
+    CancelPendingOperations();
   } else {
     StopMotorsAndTurnOutputOff();
   }
 }
 void ScanController::StopMotorsAndTurnOutputOff() {
-  if (pending_device_) return;
+  if (!pending_devices_.empty()) return;
   exposure_timer_->stop();
   operation_timer_->stop();
   cleanup_started_ = true;
@@ -258,17 +270,16 @@ void ScanController::FailScan(OperationError error) {
   state_.phase = ScanPhase::kStopping;
   emit StateChanged(state_);
   exposure_timer_->stop();
-  if (pending_device_) {
-    if (*pending_device_ == Device::kLaser) laser_.CancelScanOperation();
-    else motors_[static_cast<int>(*pending_device_)].get().CancelScanOperation();
+  if (!pending_devices_.empty()) {
+    CancelPendingOperations();
   } else {
     StopMotorsAndTurnOutputOff();
   }
 }
 void ScanController::OperationCompleted(Device device) {
-  if (pending_device_ != device) return;
+  if (!pending_devices_.erase(device)) return;
+  if (!pending_devices_.empty()) return;
   operation_timer_->stop();
-  pending_device_.reset();
   if (state_.phase == ScanPhase::kPreparing ||
       (state_.phase == ScanPhase::kStopping && cleanup_started_)) {
     ++substep_;
@@ -287,9 +298,8 @@ void ScanController::OperationCompleted(Device device) {
   }
 }
 void ScanController::OperationFailed(Device device, OperationError error) {
-  if (pending_device_ != device) return;
-  pending_device_.reset();
-  operation_timer_->stop();
+  if (!pending_devices_.erase(device)) return;
+  if (pending_devices_.empty()) operation_timer_->stop();
   if (!failure_error_) failure_error_ = error;
   if (cleanup_started_ && state_.phase == ScanPhase::kStopping) {
     ++substep_;
@@ -299,7 +309,7 @@ void ScanController::OperationFailed(Device device, OperationError error) {
   }
 }
 void ScanController::OperationCancelled(Device device) {
-  if (pending_device_ != device) return;
+  if (!pending_devices_.contains(device)) return;
   if (state_.phase == ScanPhase::kStopping) OperationCompleted(device);
   else OperationFailed(device, {{}, "Scan", "Device operation was interrupted."});
 }
@@ -310,18 +320,24 @@ void ScanController::OnLaserCompleted() { OperationCompleted(Device::kLaser); }
 void ScanController::OnLaserFailed(OperationError error) { OperationFailed(Device::kLaser, error); }
 void ScanController::OnLaserCancelled() { OperationCancelled(Device::kLaser); }
 void ScanController::OnOperationTimedOut() {
-  if (!pending_device_) return;
+  if (pending_devices_.empty()) return;
   if (!failure_error_) {
     std::ostringstream message;
     message << std::fixed << std::setprecision(6)
             << "No completion confirmation within " << configuration_.motion_timeout.count() / 1000.0
             << " seconds.";
     std::optional<Axis> axis;
-    if (*pending_device_ != Device::kLaser) {
-      axis = static_cast<Axis>(*pending_device_);
-      const auto& observation = observations_[static_cast<std::size_t>(*axis)];
-      if (pending_distance_) message << " Requested relative move: " << *pending_distance_ << " mm.";
-      if (pending_start_position_) message << " Start: " << *pending_start_position_ << " mm.";
+    for (const auto device : pending_devices_) {
+      if (device == Device::kLaser) {
+        message << " Waiting for laser output acknowledgement.";
+        continue;
+      }
+      const auto index = static_cast<std::size_t>(device);
+      if (pending_devices_.size() == 1) axis = static_cast<Axis>(device);
+      const auto& observation = observations_[index];
+      message << " Axis " << "XYZ"[index] << ':';
+      if (pending_distances_[index]) message << " Requested relative move: " << *pending_distances_[index] << " mm.";
+      if (pending_start_positions_[index]) message << " Start: " << *pending_start_positions_[index] << " mm.";
       if (observation.position_mm) message << " Last position: " << *observation.position_mm << " mm.";
       const auto flag = [](std::optional<bool> value) {
         return value ? (*value ? "yes" : "no") : "unknown";
@@ -331,19 +347,12 @@ void ScanController::OnOperationTimedOut() {
               << ", enabled=" << flag(observation.channel_enabled)
               << ", forward limit=" << flag(observation.forward_limit)
               << ", reverse limit=" << flag(observation.reverse_limit) << ".";
-    } else {
-      message << " Waiting for laser output acknowledgement.";
     }
     failure_error_ = OperationError{axis, "Scan timeout", message.str()};
   }
-  // Keep the device reserved until its cancellation reply arrives.
-  if (state_.phase != ScanPhase::kStopping || !cleanup_started_) {
-    FailScan(*failure_error_);
-  } else if (*pending_device_ == Device::kLaser) {
-    laser_.CancelScanOperation();
-  } else {
-    motors_[static_cast<int>(*pending_device_)].get().CancelScanOperation();
-  }
+  // Retain all device reservations until their cancellation replies settle.
+  if (state_.phase != ScanPhase::kStopping || !cleanup_started_) FailScan(*failure_error_);
+  else CancelPendingOperations();
 }
 void ScanController::FinishScan() {
   operation_timer_->stop();

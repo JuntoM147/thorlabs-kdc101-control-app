@@ -3,6 +3,7 @@
 
 #include <queue>
 #include <set>
+#include <utility>
 
 namespace algo {
 
@@ -93,19 +94,29 @@ Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix)
     while (matrix.PixelCount() > 0) {
         // Where am I currently
         if (matrix.At(current.x, current.y) == 1) {
-            program.push_back(Action::kLaserOn);
-
             // Greedily choose the longest horizontal or vertical line of 1s
             next = FindLongestLine(current, matrix);
 
+            // Reverse positioning may include a controller backlash overshoot and
+            // return. Reach the lower endpoint with the laser OFF, then expose
+            // the same pixels only in the positive direction.
+            PixelPosition draw_start = current;
+            PixelPosition draw_end = next;
+            if (draw_end.x < draw_start.x || draw_end.y < draw_start.y) {
+                std::swap(draw_start, draw_end);
+                program.push_back(MoveRelative{draw_start.x - current.x, draw_start.y - current.y});
+            }
+            program.push_back(Action::kLaserOn);
+
             // Isolated pixel case
-            if (next.x == current.x && next.y == current.y) {
+            if (draw_end.x == draw_start.x && draw_end.y == draw_start.y) {
                 program.push_back(Action::kWait);
             } else {
-                program.push_back(MoveRelative{next.x - current.x, next.y - current.y});
+                program.push_back(MoveRelative{draw_end.x - draw_start.x, draw_end.y - draw_start.y});
             }
 
             program.push_back(Action::kLaserOff);
+            next = draw_end;
         } else {
             // Go to nearest 1 pixel with BFS
             next = BFS(current, matrix);

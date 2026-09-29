@@ -1,4 +1,8 @@
 #include "laser_worker.h"
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QTextStream>
 
 namespace application {
 LaserWorker::LaserWorker(QObject* parent) : QObject(parent) {}
@@ -26,6 +30,14 @@ void LaserWorker::SetOutputEnabled(int id, bool enabled) {
     emit RequestFailed(id, {{}, "Laser output", "Laser is disconnected."}); return;
   }
   auto result = enabled ? laser_->TurnOn() : laser_->TurnOff();
+  // Scan output acknowledgements alongside the existing motion/position traces.
+  // This records the DAQ command result, not physical laser emission feedback.
+  QFile trace(QDir::temp().filePath("confo-quanta-laser.log"));
+  if (trace.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+    QTextStream out(&trace);
+    out << QDateTime::currentMSecsSinceEpoch() << " request=" << id
+        << " enabled=" << enabled << " sdk_ok=" << result.ok() << '\n';
+  }
   state_.output_enabled = result.ok() ? std::optional<bool>(enabled) : std::nullopt;
   emit StateChanged(state_);
   if (result.ok()) emit RequestCompleted(id);

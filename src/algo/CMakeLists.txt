@@ -13,6 +13,12 @@ add_library(algo_algorithm STATIC algorithm/algorithm.cc algorithm/algorithm.h i
 target_link_libraries(algo_algorithm PUBLIC algo_conversion)
 
 if(BUILD_TESTING)
+    add_executable(exposure_direction_test ../../tests/algo/exposure_direction_test.cc)
+    target_link_libraries(exposure_direction_test PRIVATE algo_algorithm)
+    target_compile_definitions(exposure_direction_test PRIVATE
+        EXPOSURE_FIXTURE="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/algo/testdata/name.bmp")
+    add_test(NAME exposure_direction_test COMMAND exposure_direction_test)
+    set_tests_properties(exposure_direction_test PROPERTIES TIMEOUT 60)
     add_executable(conversion_test ../../tests/algo/conversion_test.cc)
     target_link_libraries(conversion_test PRIVATE algo_conversion)
     add_test(NAME conversion_test COMMAND conversion_test)
@@ -21,7 +27,7 @@ if(BUILD_TESTING)
     add_test(NAME algorithm_test COMMAND algorithm_test)
     set_tests_properties(conversion_test algorithm_test PROPERTIES TIMEOUT 30)
     if(WIN32)
-        foreach(test_target IN ITEMS conversion_test algorithm_test)
+        foreach(test_target IN ITEMS conversion_test algorithm_test exposure_direction_test)
             add_custom_command(TARGET ${test_target} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     $<TARGET_FILE:Qt6::Core> $<TARGET_FILE:Qt6::Gui>

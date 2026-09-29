@@ -6,6 +6,7 @@
 #include <expected>
 #include <functional>
 #include <optional>
+#include <set>
 
 #include <QObject>
 #include <QTimer>
@@ -26,7 +27,7 @@ class ScanController : public QObject {
 
   [[nodiscard]] std::expected<void, OperationError> Configure(ScanConfiguration configuration);
   bool CanReset() const {
-    return !pending_device_ && (state_.phase == ScanPhase::kIdle ||
+    return pending_devices_.empty() && (state_.phase == ScanPhase::kIdle ||
         state_.phase == ScanPhase::kFailed || state_.phase == ScanPhase::kPaused);
   }
 
@@ -71,6 +72,7 @@ class ScanController : public QObject {
   void FailScan(OperationError error);
   void ContinueStopAndOff();
   void AwaitDevice(Device device);
+  void CancelPendingOperations();
   bool cleanup_started_ = false;  // Distinguishes draining an instruction from cleanup.
 
   // Borrowed devices, Application owns their lifetime
@@ -81,11 +83,11 @@ class ScanController : public QObject {
   algo::Program program_;
   ScanConfiguration configuration_;
   ScanState state_;  // Phase and progress; completed_instructions is the index.
-  std::size_t substep_ = 0;  // X then Y, or the next stop/OFF operation.
-  std::optional<Device> pending_device_;  // Device whose result we await.
+  std::size_t substep_ = 0;  // Instruction dispatched, or next stop/OFF operation.
+  std::set<Device> pending_devices_;  // All participants in the current instruction.
   std::array<AxisState, 3> observations_{};
-  std::optional<double> pending_start_position_;
-  std::optional<double> pending_distance_;
+  std::array<std::optional<double>, 4> pending_start_positions_;
+  std::array<std::optional<double>, 4> pending_distances_;
   QTimer* exposure_timer_ = nullptr;  // QObject child, finishes a timed instruction
   QTimer* operation_timer_ = nullptr;  // QObject child, detects missing device replies
 
