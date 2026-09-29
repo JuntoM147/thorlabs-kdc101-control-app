@@ -6,36 +6,38 @@
 #include <string>
 
 #include <NIDAQmx.h>
-#include "device_status/device_status.h"
+#include "error/error.h"
 
-namespace NI_DAQ {
+namespace NI_DAQ
+{
 
-using thorlabs::DeviceStatus;
+    using errors::Error;
 
-class Laser {
-public:
-    using CreateResult = std::expected<std::unique_ptr<Laser>, DeviceStatus>;
+    class Laser
+    {
+    public:
+        using CreateResult = std::expected<std::unique_ptr<Laser>, Error>;
 
-    [[nodiscard]] static CreateResult CreateLaser(const std::string& digital_output_channel = "Dev1/port0/line0");
+        [[nodiscard]] static CreateResult CreateLaser(const std::string &digital_output_channel = "Dev1/port0/line0");
 
-    ~Laser() noexcept;
-    
-    // Laser should not be copyable or movable
-    Laser(const Laser&) = delete;
-    Laser& operator=(const Laser&) = delete;
-    Laser(Laser&&) = delete;
-    Laser& operator=(Laser&&) = delete;
+        ~Laser() noexcept;
 
-    [[nodiscard]] DeviceStatus TurnOn();
-    [[nodiscard]] DeviceStatus TurnOff();
+        // Laser should not be copyable or movable
+        Laser(const Laser &) = delete;
+        Laser &operator=(const Laser &) = delete;
+        Laser(Laser &&) = delete;
+        Laser &operator=(Laser &&) = delete;
 
-private:
-    Laser() = default;
-    [[nodiscard]] DeviceStatus Write(bool on);
+        [[nodiscard]] Error TurnOn();
+        [[nodiscard]] Error TurnOff();
 
-    TaskHandle task_ = nullptr; // pointer to NI-DAQmx task for controlling the laser
-    bool configured_ = false; // Records whether the laser is configured (for proper destruction)
-};
+    private:
+        Laser() = default;
+        [[nodiscard]] Error Write(bool on);
+
+        TaskHandle task_ = nullptr; // pointer to NI-DAQmx task for controlling the laser
+        bool configured_ = false;   // Records whether the laser is configured (for proper destruction)
+    };
 
 } // namespace NI_DAQ
 

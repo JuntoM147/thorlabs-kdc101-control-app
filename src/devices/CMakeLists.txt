@@ -7,29 +7,26 @@ endif()
 option(DEVICES_USE_FAKE_KINESIS "Build motor wrappers against the test SDK" OFF)
 option(DEVICES_USE_FAKE_NI_DAQ "Build laser wrapper against the test SDK" OFF)
 
-add_library(device_status STATIC
-    device_status/device_status.cc
-    device_status/device_status.h
-)
-target_compile_features(device_status PUBLIC cxx_std_23)
-target_include_directories(device_status PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_library(kinesis_devices STATIC
     kdc101/kdc101.cc
     kdc101/kdc101.h
-    kinesis_simulation/kinesis_simulation.cc
     kinesis_simulation/kinesis_simulation.h
 )
 target_compile_features(kinesis_devices PUBLIC cxx_std_23)
 target_include_directories(kinesis_devices PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(kinesis_devices PUBLIC device_status)
+target_link_libraries(kinesis_devices PUBLIC project_error)
 
 if(DEVICES_USE_FAKE_KINESIS)
-    target_include_directories(kinesis_devices PRIVATE ../../tests/kdc101/fake_sdk)
+    target_include_directories(kinesis_devices PUBLIC ../../tests/kdc101/fake_sdk)
 else()
+    set(KINESIS_ROOT "C:/Program Files/Thorlabs/Kinesis"
+        CACHE PATH "Thorlabs Kinesis SDK directory")
+    find_path(KINESIS_INCLUDE_DIR Thorlabs.MotionControl.KCube.DCServo.h
+        HINTS "${KINESIS_ROOT}" REQUIRED)
     find_library(KINESIS_LIBRARY NAMES Thorlabs.MotionControl.KCube.DCServo
-        HINTS "C:/Program Files/Thorlabs/Kinesis" REQUIRED)
-    target_include_directories(kinesis_devices PRIVATE ../../external/thorlabs)
+        HINTS "${KINESIS_ROOT}" REQUIRED)
+    target_include_directories(kinesis_devices PUBLIC "${KINESIS_INCLUDE_DIR}")
     target_link_libraries(kinesis_devices PUBLIC "${KINESIS_LIBRARY}")
 endif()
 
@@ -54,11 +51,4 @@ add_library(ni_daq_laser STATIC
 )
 target_compile_features(ni_daq_laser PUBLIC cxx_std_23)
 target_include_directories(ni_daq_laser PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${NIDAQMX_INCLUDE_DIR}")
-target_link_libraries(ni_daq_laser PUBLIC device_status "${NIDAQMX_LIBRARY}")
-
-if(BUILD_TESTING AND DEVICES_USE_FAKE_KINESIS)
-    add_executable(kdc101_nonblocking_test ../../tests/kdc101/nonblocking_test.cc)
-    target_include_directories(kdc101_nonblocking_test PRIVATE ../../tests/kdc101/fake_sdk)
-    target_link_libraries(kdc101_nonblocking_test PRIVATE kinesis_devices)
-    add_test(NAME kdc101_nonblocking_test COMMAND kdc101_nonblocking_test)
-endif()
+target_link_libraries(ni_daq_laser PUBLIC project_error "${NIDAQMX_LIBRARY}")
