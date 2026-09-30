@@ -21,6 +21,9 @@ add_library(kinesis_devices STATIC
     kinesis_simulation/kinesis_simulation.h
 )
 target_compile_features(kinesis_devices PUBLIC cxx_std_23)
+if(MSVC)
+    target_compile_options(kinesis_devices PRIVATE /EHsc)
+endif()
 target_include_directories(kinesis_devices PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(kinesis_devices PUBLIC device_status)
 

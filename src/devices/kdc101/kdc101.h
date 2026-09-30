@@ -30,6 +30,8 @@ struct VelocityParameters {
 };
 
 constexpr int kDefaultPollingIntervalMs = 200;
+// Deliberately disable reversal detours until compensation is calibrated externally.
+constexpr double kDefaultBacklashMm = 0.0;
 
 // Represents device messages from the message queue
 enum class MotorEvent {
@@ -81,6 +83,7 @@ class KDC101 {
         [[nodiscard]] DeviceStatus SetJogVelocity(VelocityParameters parameters);
         [[nodiscard]] DeviceStatus SetHomingSpeed(double speed_mm_per_second);
         [[nodiscard]] DeviceStatus SetJogStepSize(double step_mm);
+        [[nodiscard]] DeviceStatus SetBacklash(double distance_mm);
         [[nodiscard]] DeviceStatus SetJogMode(JogMode mode, StopMode stop_mode);
 
         // Methods to start a motor operation (non-blocking)
@@ -97,6 +100,7 @@ class KDC101 {
         [[nodiscard]] DeviceStatus ClearMessageQueue();
 
     private:
+        [[nodiscard]] DeviceStatus SaveSettingsSnapshot(const char* phase);
         KDC101(std::string serial_number, std::shared_ptr<const KinesisSimulation> simulation);
 
         const std::string serial_number_;

@@ -17,6 +17,8 @@
 #include <fstream>
 #include <iomanip>
 #include <chrono>
+#include <thread>
+#include <limits>
 
 #include "device_status/device_status.h"
 #include "Thorlabs.MotionControl.KCube.DCServo.h"
@@ -179,6 +181,10 @@ KDC101::CreateResult KDC101::CreateMotor(std::string serial_number, int polling_
     device->connected_ = true;
     open_serials.insert(serial_number);
 
+    // Capture the controller before a profile can overwrite inherited settings.
+    status = device->SaveSettingsSnapshot("before_profile");
+    if (!status.ok()) return std::unexpected(status);
+
     // Load Settings
     status = LoadSettings(serial_number);
     if (!status.ok()) {
@@ -200,6 +206,17 @@ KDC101::CreateResult KDC101::CreateMotor(std::string serial_number, int polling_
     }
 
     device->polling_ = true;
+
+    status = device->SaveSettingsSnapshot("after_profile");
+    if (!status.ok()) return std::unexpected(status);
+    status = device->SetBacklash(kDefaultBacklashMm);
+    if (!status.ok()) return std::unexpected(status.WithContext("Apply startup backlash"));
+    status = device->SaveSettingsSnapshot("after_startup_backlash");
+    if (!status.ok()) return std::unexpected(status);
+    if (CC_GetBacklash(serial_number.c_str()) != 0) {
+        return std::unexpected(DeviceStatus::FailedToLoadSettings(serial_number)
+            .WithContext("Startup backlash readback did not match zero device units"));
+    }
 
     return device;
 }
@@ -327,6 +344,66 @@ DeviceStatus KDC101::SetJogStepSize(double step) {
     auto converted = ConvertMotionParameter(serial_number_, step, kUnitTypeDistance);
     if (!converted) return converted.error();
     return DeviceStatus::FromKinesis(CC_SetJogStepSize(serial_number_.c_str(), static_cast<unsigned int>(*converted)));
+}
+
+DeviceStatus KDC101::SetBacklash(double distance_mm) {
+    if (!std::isfinite(distance_mm) || distance_mm < 0.0)
+        return DeviceStatus::FromKinesis(FT_InvalidParameter).WithContext("SetBacklash: expected nonnegative millimetres");
+    int units = 0;
+    if (distance_mm > 0.0) {
+        // Bound the conversion before asking the SDK to store it in a signed int.
+        const auto resolution = GetDistanceResolution();
+        if (!resolution) return resolution.error();
+        if (distance_mm / *resolution > (std::numeric_limits<int>::max)())
+            return DeviceStatus::FromKinesis(FT_InvalidParameter).WithContext("SetBacklash: distance out of range");
+        const auto converted = ConvertMotionParameter(serial_number_, distance_mm, kUnitTypeDistance);
+        if (!converted) return converted.error().WithContext("SetBacklash");
+        units = *converted;
+    }
+    return DeviceStatus::FromKinesis(CC_SetBacklash(serial_number_.c_str(), units)).WithContext("CC_SetBacklash");
+}
+
+DeviceStatus KDC101::SaveSettingsSnapshot(const char* phase) {
+    // Only called during connection: no user motion owns this message queue yet.
+    CC_ClearMessageQueue(serial_number_.c_str());
+    auto status = DeviceStatus::FromKinesis(CC_RequestSettings(serial_number_.c_str()));
+    if (!status.ok()) return status.WithContext("Request controller settings snapshot");
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    bool received = false;
+    while (std::chrono::steady_clock::now() < deadline) {
+        WORD type = 0, id = 0;
+        DWORD data = 0;
+        if (CC_GetNextMessage(serial_number_.c_str(), &type, &id, &data)) {
+            // Kinesis GenericDevice: settingsInitialized / settingsUpdated.
+            if (type == 0 && (id == 0 || id == 1)) { received = true; break; }
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
+    if (!received) return DeviceStatus::Timeout(serial_number_, 0).WithContext("Waiting for controller settings snapshot");
+    int acceleration = 0, speed = 0, jog_acceleration = 0, jog_speed = 0;
+    status = DeviceStatus::FromKinesis(CC_GetVelParams(serial_number_.c_str(), &acceleration, &speed));
+    if (!status.ok()) return status.WithContext("Snapshot move velocity");
+    status = DeviceStatus::FromKinesis(CC_GetJogVelParams(serial_number_.c_str(), &jog_acceleration, &jog_speed));
+    if (!status.ok()) return status.WithContext("Snapshot jog velocity");
+    try {
+        const auto path = std::filesystem::temp_directory_path() / "confo-quanta-settings.log";
+        std::ofstream file(path, std::ios::app);
+        const auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        // Raw units preserve the old values without assuming the new stage calibration.
+        file << timestamp << " serial=" << serial_number_ << " phase=" << phase
+             << " units=device backlash=" << CC_GetBacklash(serial_number_.c_str())
+             << " move_speed=" << speed << " move_acceleration=" << acceleration
+             << " jog_speed=" << jog_speed << " jog_acceleration=" << jog_acceleration
+             << " jog_step=" << CC_GetJogStepSize(serial_number_.c_str())
+             << " homing_speed=" << CC_GetHomingVelocity(serial_number_.c_str()) << '\n';
+        file.flush();
+        if (!file) return DeviceStatus::FailedToLoadSettings(serial_number_).WithContext("Cannot write " + path.string());
+    } catch (const std::exception& error) {
+        return DeviceStatus::FailedToLoadSettings(serial_number_).WithContext(std::string("Settings snapshot: ") + error.what());
+    }
+    return DeviceStatus::Ok();
 }
 
 DeviceStatus KDC101::SetJogMode(JogMode mode, StopMode stop_mode) {
