@@ -1,202 +1,198 @@
 #include "error.h"
 
-#include <string>
 #include <optional>
+#include <string>
 
-namespace errors
-{
+namespace errors {
 
-  namespace
-  {
+namespace {
 
-    std::string KinesisErrorMessage(short error_code)
-    {
-      switch (error_code)
-      {
-      // FTDI and communication errors.
-      case 1:
-        return "FT_InvalidHandle: The FTDI functions have not been initialized.";
-      case 2:
-        return "FT_DeviceNotFound: The device could not be found. Ensure TLI_BuildDeviceList() has been called.";
-      case 3:
-        return "FT_DeviceNotOpened: The device must be opened before it can be accessed.";
-      case 4:
-        return "FT_IOError: An I/O error occurred in the FTDI communication interface.";
-      case 5:
-        return "FT_InsufficientResources: Insufficient resources are available.";
-      case 6:
-        return "FT_InvalidParameter: An invalid parameter was supplied.";
-      case 7:
-        return "FT_DeviceNotPresent: The device is no longer connected.";
-      case 8:
-        return "FT_IncorrectDevice: The detected device does not match the expected device.";
+std::string KinesisErrorMessage(short error_code) {
+  switch (error_code) {
+    // FTDI and communication errors.
+    case 1:
+      return "FT_InvalidHandle: The FTDI functions have not been initialized.";
+    case 2:
+      return "FT_DeviceNotFound: The device could not be found. Ensure "
+             "TLI_BuildDeviceList() has been called.";
+    case 3:
+      return "FT_DeviceNotOpened: The device must be opened before it can be "
+             "accessed.";
+    case 4:
+      return "FT_IOError: An I/O error occurred in the FTDI communication "
+             "interface.";
+    case 5:
+      return "FT_InsufficientResources: Insufficient resources are available.";
+    case 6:
+      return "FT_InvalidParameter: An invalid parameter was supplied.";
+    case 7:
+      return "FT_DeviceNotPresent: The device is no longer connected.";
+    case 8:
+      return "FT_IncorrectDevice: The detected device does not match the "
+             "expected device.";
 
-      // Device-library errors.
-      case 16:
-        return "FT_NoDLLLoaded: The required device library could not be found.";
-      case 17:
-        return "FT_NoFunctionsAvailable: No functions are available for this device.";
-      case 18:
-        return "FT_FunctionNotAvailable: The requested function is not available for this device.";
-      case 19:
-        return "FT_BadFunctionPointer: A bad function pointer was detected.";
-      case 20:
-        return "FT_GenericFunctionFail: The function failed to complete successfully.";
-      case 21:
-        return "FT_SpecificFunctionFail: The function failed to complete successfully.";
+    // Device-library errors.
+    case 16:
+      return "FT_NoDLLLoaded: The required device library could not be found.";
+    case 17:
+      return "FT_NoFunctionsAvailable: No functions are available for this "
+             "device.";
+    case 18:
+      return "FT_FunctionNotAvailable: The requested function is not available "
+             "for this device.";
+    case 19:
+      return "FT_BadFunctionPointer: A bad function pointer was detected.";
+    case 20:
+      return "FT_GenericFunctionFail: The function failed to complete "
+             "successfully.";
+    case 21:
+      return "FT_SpecificFunctionFail: The function failed to complete "
+             "successfully.";
 
-      // General DLL control errors.
-      case 32:
-        return "TL_ALREADY_OPEN: The device is already open.";
-      case 33:
-        return "TL_NO_RESPONSE: The device has stopped responding.";
-      case 34:
-        return "TL_NOT_IMPLEMENTED: The requested function has not been implemented.";
-      case 35:
-        return "TL_FAULT_REPORTED: The device reported a fault.";
-      case 36:
-        return "TL_INVALID_OPERATION: The operation cannot be completed in the current state.";
-      case 40:
-        return "TL_DISCONNECTING: The operation cannot be completed because the device is disconnecting.";
-      case 41:
-        return "TL_FIRMWARE_BUG: The device firmware reported an internal error.";
-      case 42:
-        return "TL_INITIALIZATION_FAILURE: The device failed to initialize.";
-      case 43:
-        return "TL_INVALID_CHANNEL: An invalid channel address was supplied.";
+    // General DLL control errors.
+    case 32:
+      return "TL_ALREADY_OPEN: The device is already open.";
+    case 33:
+      return "TL_NO_RESPONSE: The device has stopped responding.";
+    case 34:
+      return "TL_NOT_IMPLEMENTED: The requested function has not been "
+             "implemented.";
+    case 35:
+      return "TL_FAULT_REPORTED: The device reported a fault.";
+    case 36:
+      return "TL_INVALID_OPERATION: The operation cannot be completed in the "
+             "current state.";
+    case 40:
+      return "TL_DISCONNECTING: The operation cannot be completed because the "
+             "device is disconnecting.";
+    case 41:
+      return "TL_FIRMWARE_BUG: The device firmware reported an internal error.";
+    case 42:
+      return "TL_INITIALIZATION_FAILURE: The device failed to initialize.";
+    case 43:
+      return "TL_INVALID_CHANNEL: An invalid channel address was supplied.";
 
-      // Motor-specific errors.
-      case 37:
-        return "TL_UNHOMED: The device must be homed before performing this operation.";
-      case 38:
-        return "TL_INVALID_POSITION: The requested operation would result in an illegal position.";
-      case 39:
-        return "TL_INVALID_VELOCITY_PARAMETER: The velocity parameter is invalid; velocity must be greater than zero.";
-      case 44:
-        return "TL_CANNOT_HOME_DEVICE: The device cannot perform homing. Check the limit-switch configuration.";
-      case 45:
-        return "TL_JOG_CONTINOUS_MODE: The configured jog mode is invalid for this jog operation.";
-      case 46:
-        return "TL_NO_MOTOR_INFO: Motor parameters required for real-world unit conversion are unavailable.";
-      case 47:
-        return "TL_CMD_TEMP_UNAVAILABLE: The command is temporarily unavailable; the device may be busy.";
+    // Motor-specific errors.
+    case 37:
+      return "TL_UNHOMED: The device must be homed before performing this "
+             "operation.";
+    case 38:
+      return "TL_INVALID_POSITION: The requested operation would result in an "
+             "illegal position.";
+    case 39:
+      return "TL_INVALID_VELOCITY_PARAMETER: The velocity parameter is "
+             "invalid; velocity must be greater than zero.";
+    case 44:
+      return "TL_CANNOT_HOME_DEVICE: The device cannot perform homing. Check "
+             "the limit-switch configuration.";
+    case 45:
+      return "TL_JOG_CONTINOUS_MODE: The configured jog mode is invalid for "
+             "this jog operation.";
+    case 46:
+      return "TL_NO_MOTOR_INFO: Motor parameters required for real-world unit "
+             "conversion are unavailable.";
+    case 47:
+      return "TL_CMD_TEMP_UNAVAILABLE: The command is temporarily unavailable; "
+             "the device may be busy.";
 
-      default:
-        return "Unknown Kinesis error code: " + std::to_string(error_code);
-      }
-    }
+    default:
+      return "Unknown Kinesis error code: " + std::to_string(error_code);
+  }
+}
 
-  } // namespace
+}  // namespace
 
-  Error::Error(ErrorCode error_code, std::optional<short> kinesis_error_code, std::string error_message)
-      : error_code_{error_code},
-        kinesis_error_code_{kinesis_error_code},
-        error_message_{error_message} {}
+Error::Error(ErrorCode error_code, std::optional<short> kinesis_error_code,
+             std::string error_message)
+    : error_code_{error_code},
+      kinesis_error_code_{kinesis_error_code},
+      error_message_{error_message} {}
 
-  Error Error::Ok()
-  {
-    return Error(ErrorCode::kOk, std::nullopt, "Success");
+Error Error::Ok() { return Error(ErrorCode::kOk, std::nullopt, "Success"); }
+
+Error Error::WithContext(const std::string& context) const {
+  auto result = *this;
+  if (!ok()) {
+    result.error_message_ = context + ": " + error_message_;
   }
 
-  Error Error::WithContext(const std::string &context) const
-  {
-    auto result = *this;
-    if (!ok())
-    {
-      result.error_message_ = context + ": " + error_message_;
-    }
+  return result;
+}
 
-    return result;
+Error Error::FromKinesis(short kinesis_error_code) {
+  if (kinesis_error_code == 0) {
+    return Ok();
   }
 
-  Error Error::FromKinesis(short kinesis_error_code)
-  {
-    if (kinesis_error_code == 0)
-    {
-      return Ok();
-    }
+  return Error(ErrorCode::kKinesisError,
+               std::optional<short>{kinesis_error_code},
+               KinesisErrorMessage(kinesis_error_code));
+}
 
-    return Error(ErrorCode::kKinesisError,
-                 std::optional<short>{kinesis_error_code},
-                 KinesisErrorMessage(kinesis_error_code));
-  }
+Error Error::DeviceNotFound(const std::string& serial_number) {
+  return Error(ErrorCode::kDeviceNotFound, std::nullopt,
+               "Device with serial number " + serial_number + " not found");
+}
 
-  Error Error::DeviceNotFound(const std::string &serial_number)
-  {
-    return Error(ErrorCode::kDeviceNotFound,
-                 std::nullopt,
-                 "Device with serial number " + serial_number + " not found");
+Error Error::FromNiDaq(std::int32_t code, const std::string& message) {
+  // NI-DAQmx positive return codes are warnings, not failures.
+  if (code >= 0) {
+    return Ok();
   }
+  Error status(ErrorCode::kNiDaqError, std::nullopt,
+               message.empty() ? "NI-DAQmx error code: " + std::to_string(code)
+                               : message);
+  status.ni_daq_error_code_ = code;
+  return status;
+}
 
-  Error Error::FromNiDaq(std::int32_t code, const std::string &message)
-  {
-    // NI-DAQmx positive return codes are warnings, not failures.
-    if (code >= 0)
-    {
-      return Ok();
-    }
-    Error status(ErrorCode::kNiDaqError, std::nullopt,
-                 message.empty() ? "NI-DAQmx error code: " + std::to_string(code) : message);
-    status.ni_daq_error_code_ = code;
-    return status;
-  }
+Error Error::InvalidLaserLineCount(const std::string& line,
+                                   std::uint32_t count) {
+  return Error(ErrorCode::kLaserLineConfigurationError, std::nullopt,
+               "Laser requires exactly one digital output line; " + line +
+                   " selects " + std::to_string(count) + " lines.");
+}
 
-  Error Error::InvalidLaserLineCount(const std::string &line, std::uint32_t count)
-  {
-    return Error(ErrorCode::kLaserLineConfigurationError, std::nullopt,
-                 "Laser requires exactly one digital output line; " + line +
-                     " selects " + std::to_string(count) + " lines.");
-  }
+Error Error::FailedToLoadSettings(const std::string& serial_number) {
+  return Error(
+      ErrorCode::kLoadSettingsError, std::nullopt,
+      "Failed to load settings for device with serial number " + serial_number);
+}
 
-  Error Error::FailedToLoadSettings(const std::string &serial_number)
-  {
-    return Error(ErrorCode::kLoadSettingsError,
-                 std::nullopt,
-                 "Failed to load settings for device with serial number " + serial_number);
-  }
+Error Error::FailedToStartPolling(const std::string& serial_number) {
+  return Error(
+      ErrorCode::kPollingError, std::nullopt,
+      "Failed to start polling device with serial number " + serial_number);
+}
+Error Error::NotConnected(const std::string& serial_number) {
+  return Error(ErrorCode::kConnectionError, std::nullopt,
+               "Device with serial number " + serial_number + " not connected");
+}
 
-  Error Error::FailedToStartPolling(const std::string &serial_number)
-  {
-    return Error(ErrorCode::kPollingError,
-                 std::nullopt,
-                 "Failed to start polling device with serial number " + serial_number);
-  }
-  Error Error::NotConnected(const std::string &serial_number)
-  {
-    return Error(ErrorCode::kConnectionError,
-                 std::nullopt,
-                 "Device with serial number " + serial_number + " not connected");
-  }
+Error Error::MotionBelowResolution(const std::string& serial_number) {
+  return Error(ErrorCode::kMotionResolutionError, std::nullopt,
+               "Relative move converts to zero device units for " +
+                   serial_number +
+                   ". Check the pixel size and loaded stage profile.");
+}
 
-  Error Error::MotionBelowResolution(const std::string &serial_number)
-  {
-    return Error(ErrorCode::kMotionResolutionError, std::nullopt,
-                 "Relative move converts to zero device units for " + serial_number +
-                     ". Check the pixel size and loaded stage profile.");
-  }
+Error Error::Timeout(const std::string& serial_number, int expected_message) {
+  return Error(ErrorCode::kTimeout, std::nullopt,
+               "Device with serial number " + serial_number + " timed out");
+}
 
-  Error Error::Timeout(const std::string &serial_number, int expected_message)
-  {
-    return Error(ErrorCode::kTimeout,
-                 std::nullopt,
-                 "Device with serial number " + serial_number + " timed out");
-  }
+Error Error::InvalidArgument(const std::string& message) {
+  return Failure(ErrorCode::kInvalidArgument, message);
+}
 
-  Error Error::InvalidArgument(const std::string &message)
-  {
-    return Failure(ErrorCode::kInvalidArgument, message);
-  }
+Error Error::Failure(ErrorCode code, const std::string& message) {
+  return Error(code, std::nullopt, message);
+}
 
-  Error Error::Failure(ErrorCode code, const std::string &message)
-  {
-    return Error(code, std::nullopt, message);
-  }
+Error Error::WithDevice(const std::string& device) const {
+  auto result = *this;
+  result.device_ = device;
+  return result;
+}
 
-  Error Error::WithDevice(const std::string &device) const
-  {
-    auto result = *this;
-    result.device_ = device;
-    return result;
-  }
-
-} // namespace errors
+}  // namespace errors

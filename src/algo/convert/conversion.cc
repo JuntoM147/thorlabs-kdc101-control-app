@@ -46,7 +46,8 @@ std::expected<BinaryMatrix, std::string> Convert(const QImage& image) {
     for (int y = 0; y < image.height(); ++y) {
       for (int x = 0; x < image.width(); ++x) {
         const QColor pixel = image.pixelColor(x, y);
-        const bool is_white = pixel.red() == 255 && pixel.green() == 255 && pixel.blue() == 255;
+        const bool is_white =
+            pixel.red() == 255 && pixel.green() == 255 && pixel.blue() == 255;
         result.Set(x, y, !is_white);
       }
     }

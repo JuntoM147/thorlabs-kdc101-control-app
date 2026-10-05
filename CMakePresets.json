@@ -1,24 +1,13 @@
 {
   "version": 2,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 21,
-    "patch": 0
-  },
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
   "configurePresets": [
     {
       "name": "app",
-      "displayName": "UI preview and worker header review",
-      "description": "Build the UI preview and check worker declarations; no hardware connection is started.",
+      "displayName": "Qt app",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
-      "binaryDir": "${sourceDir}/build-app",
-      "cacheVariables": {
-        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build-app",
-        "BUILD_TESTING": "OFF",
-        "DEVICES_USE_FAKE_KINESIS": "OFF",
-        "DEVICES_USE_FAKE_NI_DAQ": "OFF"
-      }
+      "binaryDir": "${sourceDir}/build-app"
     }
   ],
   "buildPresets": [

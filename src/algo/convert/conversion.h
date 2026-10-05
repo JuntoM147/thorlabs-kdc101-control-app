@@ -30,7 +30,8 @@ class BinaryMatrix {
 };
 
 // Pure white RGB pixels become 0; every other colour becomes 1
-[[nodiscard]] std::expected<BinaryMatrix, std::string> Convert(const QImage& image);
+[[nodiscard]] std::expected<BinaryMatrix, std::string> Convert(
+    const QImage& image);
 
 }  // namespace algo
 

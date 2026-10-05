@@ -10,7 +10,8 @@ struct Stroke {
   PixelPosition end;
 };
 
-void RowMajorOrder(const BinaryMatrix& matrix, int row, std::vector<Stroke>& strokes) {
+void RowMajorOrder(const BinaryMatrix& matrix, int row,
+                   std::vector<Stroke>& strokes) {
   int x = 0;
   while (x < matrix.Width()) {
     if (!matrix.At(x, row)) {
@@ -24,7 +25,8 @@ void RowMajorOrder(const BinaryMatrix& matrix, int row, std::vector<Stroke>& str
   }
 }
 
-void RowMajorOrderReverse(const BinaryMatrix& matrix, int row, std::vector<Stroke>& strokes) {
+void RowMajorOrderReverse(const BinaryMatrix& matrix, int row,
+                          std::vector<Stroke>& strokes) {
   int x = matrix.Width() - 1;
   while (x >= 0) {
     if (!matrix.At(x, row)) {
@@ -38,7 +40,8 @@ void RowMajorOrderReverse(const BinaryMatrix& matrix, int row, std::vector<Strok
   }
 }
 
-void ColumnMajorOrder(const BinaryMatrix& matrix, int col, std::vector<Stroke>& strokes) {
+void ColumnMajorOrder(const BinaryMatrix& matrix, int col,
+                      std::vector<Stroke>& strokes) {
   int y = 0;
   while (y < matrix.Height()) {
     if (!matrix.At(col, y)) {
@@ -52,7 +55,8 @@ void ColumnMajorOrder(const BinaryMatrix& matrix, int col, std::vector<Stroke>& 
   }
 }
 
-void ColumnMajorOrderReverse(const BinaryMatrix& matrix, int col, std::vector<Stroke>& strokes) {
+void ColumnMajorOrderReverse(const BinaryMatrix& matrix, int col,
+                             std::vector<Stroke>& strokes) {
   int y = matrix.Height() - 1;
   while (y >= 0) {
     if (!matrix.At(col, y)) {
@@ -66,7 +70,8 @@ void ColumnMajorOrderReverse(const BinaryMatrix& matrix, int col, std::vector<St
   }
 }
 
-std::vector<Stroke> FindStokes(const BinaryMatrix& matrix, Direction direction) {
+std::vector<Stroke> FindStokes(const BinaryMatrix& matrix,
+                               Direction direction) {
   std::vector<Stroke> strokes;
 
   // Empty matrix, no strokes to find
@@ -107,14 +112,15 @@ void MoveTo(Program& program, PixelPosition& current, PixelPosition target) {
 
 }  // namespace
 
-Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix, Direction direction) {
+Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix,
+                             Direction direction) {
   const auto strokes = FindStokes(matrix, direction);
 
   Program program{Action::kLaserOff};
   PixelPosition current = start;
   for (const auto& stroke : strokes) {
     MoveTo(program, current, stroke.start);
-    
+
     program.push_back(Action::kLaserOn);
 
     if (stroke.start.x == stroke.end.x && stroke.start.y == stroke.end.y) {
