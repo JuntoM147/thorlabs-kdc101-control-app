@@ -1,5 +1,6 @@
 #include "scan_worker.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -17,6 +18,10 @@ void ScanWorker::EnsureTimers() {
   exposure_timer_->setSingleShot(true);
   connect(exposure_timer_, &QTimer::timeout, this,
           &ScanWorker::OnExposureFinished);
+  progress_timer_ = new QTimer(this);
+  progress_timer_->setInterval(1000);
+  connect(progress_timer_, &QTimer::timeout, this,
+          &ScanWorker::PublishProgress);
 }
 
 void ScanWorker::Start(ScanJob job) {
@@ -54,6 +59,9 @@ void ScanWorker::Start(ScanJob job) {
   }
   job_ = std::move(job);
   progress_ = {ScanPhase::kRunning, 0, job_.instructions.size()};
+  active_elapsed_ms_ = 0;
+  active_timer_.start();
+  progress_timer_->start();
   pause_requested_ = false;
   program_laser_on_ = false;
   restoring_laser_ = false;
@@ -64,7 +72,29 @@ void ScanWorker::Start(ScanJob job) {
 }
 
 RequestId ScanWorker::NextRequestId() { return next_request_id_++; }
-void ScanWorker::PublishProgress() { emit ProgressChanged(progress_); }
+void ScanWorker::PublishProgress() {
+  const bool active = progress_.phase == ScanPhase::kRunning ||
+                      progress_.phase == ScanPhase::kPausing;
+  if (active || progress_.phase == ScanPhase::kPaused) {
+    const auto elapsed_ms =
+        active_elapsed_ms_ +
+        (active_timer_.isValid() ? active_timer_.elapsed() : 0);
+    const auto completed = progress_.completed_instructions;
+    // Wait for a small sample before extrapolating. Instructions vary in cost,
+    // so this is deliberately a rough estimate rather than a motion model.
+    if (completed >= 3 && elapsed_ms >= 1000) {
+      const auto remaining = progress_.total_instructions - completed;
+      const long double seconds =
+          std::ceil((elapsed_ms / 1000.0L) * remaining / completed);
+      progress_.estimated_remaining = std::chrono::seconds(static_cast<qint64>(
+          std::min(seconds, static_cast<long double>(
+                                std::numeric_limits<qint64>::max()))));
+    }
+  } else {
+    progress_.estimated_remaining.reset();
+  }
+  emit ProgressChanged(progress_);
+}
 
 void ScanWorker::RequestLaser(bool enabled) {
   pending_laser_ = NextRequestId();
@@ -165,6 +195,9 @@ void ScanWorker::OnLaserFinished(RequestId id, errors::Error result) {
   if (pause_laser_off_) {
     pause_laser_off_ = false;
     progress_.phase = ScanPhase::kPaused;
+    active_elapsed_ms_ += active_timer_.elapsed();
+    active_timer_.invalidate();
+    progress_timer_->stop();
     PublishProgress();
   } else if (restoring_laser_) {
     restoring_laser_ = false;
@@ -194,6 +227,8 @@ void ScanWorker::Resume() {
   if (progress_.phase != ScanPhase::kPaused) return;
   pause_requested_ = false;
   progress_.phase = ScanPhase::kRunning;
+  active_timer_.start();
+  progress_timer_->start();
   PublishProgress();
   if (program_laser_on_) {
     restoring_laser_ = true;
@@ -208,6 +243,8 @@ void ScanWorker::BeginCleanup(errors::Error result) {
   EnsureTimers();
   operation_timer_->stop();
   exposure_timer_->stop();
+  progress_timer_->stop();
+  active_timer_.invalidate();
   progress_.phase = ScanPhase::kStopping;
   final_result_ = result;
   cleanup_failed_ = false;

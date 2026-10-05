@@ -2,6 +2,7 @@
 #define FRONTEND_STATUS_H_
 
 #include <QWidget>
+
 #include "main_window/main_window.h"
 
 namespace ui {

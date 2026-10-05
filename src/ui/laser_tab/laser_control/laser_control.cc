@@ -1,22 +1,24 @@
 #include "laser_control.h"
-#include "shared/display_text.h"
-#include <QLineEdit>
-#include <QCheckBox>
-#include <QPainter>
-#include <memory>
-#include <limits>
 
+#include <QCheckBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPainter>
 #include <QPushButton>
-#include <QVBoxLayout>
 #include <QSizePolicy>
+#include <QVBoxLayout>
+#include <limits>
+#include <memory>
+
+#include "shared/display_text.h"
 
 namespace ui {
 namespace {
 
-// Keep native checkbox keyboard/accessibility behavior, but draw a compact switch.
+// Keep native checkbox keyboard/accessibility behavior, but draw a compact
+// switch.
 class OutputSwitch : public QCheckBox {
  public:
   explicit OutputSwitch(QWidget* parent) : QCheckBox(parent) {
@@ -26,14 +28,17 @@ class OutputSwitch : public QCheckBox {
   }
 
  protected:
-  bool hitButton(const QPoint& point) const override { return rect().contains(point); }
+  bool hitButton(const QPoint& point) const override {
+    return rect().contains(point);
+  }
   // The device observation confirms changes, not the click itself.
   void nextCheckState() override {}
   void paintEvent(QPaintEvent*) override {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    const QColor track = !isEnabled() ? QColor("#e0e5ec")
-        : isChecked() ? QColor("#126bf0") : QColor("#8794a8");
+    const QColor track = !isEnabled()  ? QColor("#e0e5ec")
+                         : isChecked() ? QColor("#126bf0")
+                                       : QColor("#8794a8");
     painter.setPen(Qt::NoPen);
     painter.setBrush(track);
     painter.drawRoundedRect(QRectF(2, 3, 44, 22), 11, 11);
@@ -48,7 +53,6 @@ class OutputSwitch : public QCheckBox {
 };
 
 }  // namespace
-
 
 QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   auto* section = new QGroupBox(QObject::tr("Laser control"), parent);
@@ -71,7 +75,8 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   indicator->setProperty("connected", false);
   indicator->setStyleSheet(
       "QLabel[connected=\"false\"] { background: #ed1735; border-radius: 6px; }"
-      "QLabel[connected=\"true\"] { background: #00a34a; border-radius: 6px; }");
+      "QLabel[connected=\"true\"] { background: #00a34a; border-radius: 6px; "
+      "}");
 
   auto* connection_status = new QLabel(QObject::tr("Disconnected"), section);
   connection_status->setAccessibleName(QObject::tr("Laser connection status"));
@@ -104,65 +109,93 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   auto* channel = new QLineEdit(QStringLiteral("Dev1/port0/line0"), section);
   channel->setAccessibleName(QObject::tr("Laser digital output channel"));
   layout->insertWidget(1, channel);
-  QObject::connect(connect_button, &QPushButton::clicked, section, [&view, connect_button, channel] {
-    if (connect_button->property("connected").toBool()) {
-      emit view.DisconnectLaserRequested();
-    } else if (channel->text().trimmed().isEmpty()) {
-      view.ShowError({{}, "Connect laser", "Enter a digital output channel."});
-    } else {
-      emit view.ConnectLaserRequested({channel->text().trimmed().toStdString()});
-    }
-  });
+  QObject::connect(
+      connect_button, &QPushButton::clicked, section,
+      [&view, connect_button, channel] {
+        if (connect_button->property("connected").toBool()) {
+          emit view.DisconnectLaserRequested();
+        } else if (channel->text().trimmed().isEmpty()) {
+          view.ShowError(
+              {{}, "Connect laser", "Enter a digital output channel."});
+        } else {
+          emit view.ConnectLaserRequested(
+              {channel->text().trimmed().toStdString()});
+        }
+      });
   QObject::connect(status, &QCheckBox::clicked, section, [&view, status] {
-    emit view.SetLaserOutputRequested(status->property("outputKnown").toBool() && !status->property("outputEnabled").toBool());
+    emit view.SetLaserOutputRequested(
+        status->property("outputKnown").toBool() &&
+        !status->property("outputEnabled").toBool());
   });
   struct Availability {
-    application::LaserState state{};
+    ui::LaserState state{};
     bool pending = false;
   };
   const auto availability = std::make_shared<Availability>();
   const auto refresh = [=] {
     const auto& state = availability->state;
-    const bool connected = state.connection == application::ConnectionState::kConnected;
+    const bool connected = state.connection == ui::ConnectionState::kConnected;
     connect_button->setProperty("connected", connected);
-    connect_button->setText(connected ? QObject::tr("Disconnect") : QObject::tr("Connect"));
-    connect_button->setEnabled(!availability->pending && state.connection != application::ConnectionState::kConnecting);
-    channel->setEnabled(!availability->pending && !connected && state.connection != application::ConnectionState::kConnecting);
+    connect_button->setText(connected ? QObject::tr("Disconnect")
+                                      : QObject::tr("Connect"));
+    connect_button->setEnabled(!availability->pending &&
+                               state.connection !=
+                                   ui::ConnectionState::kConnecting);
+    channel->setEnabled(!availability->pending && !connected &&
+                        state.connection != ui::ConnectionState::kConnecting);
     status->setEnabled(connected && !availability->pending);
     status->setProperty("outputEnabled", state.output_enabled.value_or(false));
     status->setProperty("outputKnown", state.output_enabled.has_value());
-    if (!availability->pending) status->setChecked(connected && state.output_enabled.value_or(false));
-    status->setToolTip(!connected ? QObject::tr("Connect the laser to control its output.")
-        : !state.output_enabled ? QObject::tr("Output state unavailable. Click to request output off.")
-        : *state.output_enabled ? QObject::tr("Output on. Click to turn off. Last confirmed command, not measured emission.")
-                                : QObject::tr("Output off. Click to turn on. Last confirmed command, not measured emission."));
+    if (!availability->pending)
+      status->setChecked(connected && state.output_enabled.value_or(false));
+    status->setToolTip(
+        !connected ? QObject::tr("Connect the laser to control its output.")
+        : !state.output_enabled
+            ? QObject::tr(
+                  "Output state unavailable. Click to request output off.")
+        : *state.output_enabled
+            ? QObject::tr("Output on. Click to turn off. Last confirmed "
+                          "command, not measured emission.")
+            : QObject::tr("Output off. Click to turn on. Last confirmed "
+                          "command, not measured emission."));
     connection_status->setText(ConnectionText(state.connection));
-    indicator->setStyleSheet(connected ? "background: #00a34a; border-radius: 6px;"
-                                      : "background: #ed1735; border-radius: 6px;");
+    indicator->setStyleSheet(connected
+                                 ? "background: #00a34a; border-radius: 6px;"
+                                 : "background: #ed1735; border-radius: 6px;");
   };
-  QObject::connect(&view, &MainWindow::LaserStateUpdated, section, [=](application::LaserState state) {
-    availability->state = state;
-    refresh();
-  });
-  QObject::connect(&view, &MainWindow::LaserRequestPending, section, [=](bool pending) {
-    availability->pending = pending;
-    refresh();
-  });
+  QObject::connect(&view, &MainWindow::LaserStateUpdated, section,
+                   [=](ui::LaserState state) {
+                     availability->state = state;
+                     refresh();
+                   });
+  QObject::connect(&view, &MainWindow::LaserRequestPending, section,
+                   [=](bool pending) {
+                     availability->pending = pending;
+                     refresh();
+                   });
   manual->setEnabled(false);
-  QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual, &QWidget::setEnabled);
+  QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual,
+                   &QWidget::setEnabled);
 
-  auto* pixel_size_label = new QLabel(QObject::tr("Pixel size (µm/pixel)"), section);
-  auto* pixel_size = new QLineEdit(QString::number(view.PixelSizeMicrometres(), 'g', 12), section);
-  pixel_size->setAccessibleName(QObject::tr("Pixel size in micrometres per pixel"));
+  auto* pixel_size_label =
+      new QLabel(QObject::tr("Pixel size (µm/pixel)"), section);
+  auto* pixel_size = new QLineEdit(
+      QString::number(view.PixelSizeMicrometres(), 'g', 12), section);
+  pixel_size->setAccessibleName(
+      QObject::tr("Pixel size in micrometres per pixel"));
   pixel_size->setAlignment(Qt::AlignRight);
-  pixel_size->setToolTip(QObject::tr("Physical travel per image pixel. Applied to the next scan."));
+  pixel_size->setToolTip(QObject::tr(
+      "Physical travel per image pixel. Applied to the next scan."));
   pixel_size_label->setBuddy(pixel_size);
-  QObject::connect(pixel_size, &QLineEdit::textChanged, section, [&view](const QString& text) {
-    bool ok = false;
-    const double value = text.toDouble(&ok);
-    view.SetPixelSizeMicrometres(ok ? value : std::numeric_limits<double>::quiet_NaN());
-  });
-  QObject::connect(&view, &MainWindow::ScanInputsEnabled, pixel_size, &QWidget::setEnabled);
+  QObject::connect(pixel_size, &QLineEdit::textChanged, section,
+                   [&view](const QString& text) {
+                     bool ok = false;
+                     const double value = text.toDouble(&ok);
+                     view.SetPixelSizeMicrometres(
+                         ok ? value : std::numeric_limits<double>::quiet_NaN());
+                   });
+  QObject::connect(&view, &MainWindow::ScanInputsEnabled, pixel_size,
+                   &QWidget::setEnabled);
   outer_layout->addWidget(pixel_size_label);
   outer_layout->addWidget(pixel_size);
   outer_layout->addStretch();

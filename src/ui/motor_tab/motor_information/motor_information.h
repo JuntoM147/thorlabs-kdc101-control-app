@@ -2,6 +2,7 @@
 #define FRONTEND_MOTOR_INFORMATION_H
 
 #include <QWidget>
+
 #include "main_window/main_window.h"
 
 namespace ui {

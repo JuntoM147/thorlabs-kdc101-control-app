@@ -1,6 +1,7 @@
 #ifndef WORKERS_SCAN_WORKER_H_
 #define WORKERS_SCAN_WORKER_H_
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QTimer>
 #include <optional>
@@ -67,6 +68,9 @@ class ScanWorker final : public QObject {
 
   QTimer* operation_timer_ = nullptr;
   QTimer* exposure_timer_ = nullptr;
+  QTimer* progress_timer_ = nullptr;
+  QElapsedTimer active_timer_;
+  qint64 active_elapsed_ms_ = 0;
 };
 
 }  // namespace workers

@@ -3,27 +3,38 @@
 
 #include <QObject>
 #include <QString>
-#include "../../application/application_types/application_types.h"
+
+#include "ui_types.h"
 
 namespace ui {
-inline QString ConnectionText(application::ConnectionState state) {
+inline QString ConnectionText(ui::ConnectionState state) {
   switch (state) {
-    case application::ConnectionState::kDisconnected: return QObject::tr("Disconnected");
-    case application::ConnectionState::kConnecting: return QObject::tr("Connecting");
-    case application::ConnectionState::kConnected: return QObject::tr("Connected");
-    case application::ConnectionState::kFaulted: return QObject::tr("Faulted");
+    case ui::ConnectionState::kDisconnected:
+      return QObject::tr("Disconnected");
+    case ui::ConnectionState::kConnecting:
+      return QObject::tr("Connecting");
+    case ui::ConnectionState::kConnected:
+      return QObject::tr("Connected");
+    case ui::ConnectionState::kFaulted:
+      return QObject::tr("Faulted");
   }
   return QObject::tr("Unknown");
 }
 
-inline QString OperationText(application::OperationState state) {
+inline QString OperationText(ui::OperationState state) {
   switch (state) {
-    case application::OperationState::kIdle: return QObject::tr("Idle");
-    case application::OperationState::kHoming: return QObject::tr("Homing");
-    case application::OperationState::kMoving: return QObject::tr("Moving");
-    case application::OperationState::kJogging: return QObject::tr("Jogging");
-    case application::OperationState::kDriving: return QObject::tr("Driving");
-    case application::OperationState::kStopping: return QObject::tr("Stopping");
+    case ui::OperationState::kIdle:
+      return QObject::tr("Idle");
+    case ui::OperationState::kHoming:
+      return QObject::tr("Homing");
+    case ui::OperationState::kMoving:
+      return QObject::tr("Moving");
+    case ui::OperationState::kJogging:
+      return QObject::tr("Jogging");
+    case ui::OperationState::kDriving:
+      return QObject::tr("Driving");
+    case ui::OperationState::kStopping:
+      return QObject::tr("Stopping");
   }
   return QObject::tr("Unknown");
 }

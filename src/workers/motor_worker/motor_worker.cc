@@ -75,7 +75,7 @@ void MotorWorker::ConnectDevice(RequestId id, QString serial_number,
   }
   poll_timer_->start(kPollIntervalMs);
   PublishState();
-  emit RequestFinished(id, errors::Error::Ok());
+  emit RequestFinished(id, PublishSettings());
 }
 
 void MotorWorker::DisconnectDevice(RequestId id) {
@@ -104,7 +104,25 @@ void MotorWorker::Configure(RequestId id, MotorSettings settings) {
     result = motor_->SetJogStepSize(*settings.jog_step_mm);
   if (result.ok() && settings.backlash_mm)
     result = motor_->SetBacklash(*settings.backlash_mm);
+  // Read back even after a partial update; show device values, not requested
+  // ones.
+  const auto read_result = PublishSettings();
+  if (result.ok()) result = read_result;
   emit RequestFinished(id, result);
+}
+
+errors::Error MotorWorker::PublishSettings() {
+  auto configuration = motor_->GetConfiguration();
+  MotorSettings settings;
+  if (configuration) {
+    settings.move.acceleration_mm_per_second_squared =
+        configuration->acceleration_mm_per_second_squared;
+    settings.homing_speed_mm_per_second =
+        configuration->homing_speed_mm_per_second;
+    settings.backlash_mm = configuration->backlash_mm;
+  }
+  emit SettingsChanged(settings);
+  return configuration ? errors::Error::Ok() : configuration.error();
 }
 
 void MotorWorker::StartMotion(RequestId id, thorlabs::MotorEvent completion,

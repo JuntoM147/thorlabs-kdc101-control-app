@@ -1,19 +1,18 @@
 #include "scan_control.h"
-#include <algorithm>
 
-#include <climits>
-#include <QIntValidator>
-#include <QLineEdit>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QIntValidator>
 #include <QLabel>
+#include <QLineEdit>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QSizePolicy>
-#include <QSignalBlocker>
 #include <QStyle>
 #include <QVBoxLayout>
+#include <algorithm>
+#include <climits>
 
 namespace ui {
 
@@ -44,52 +43,40 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   for (auto* field : {start_x, start_y}) {
     field->setValidator(new QIntValidator(0, INT_MAX, field));
     field->setAlignment(Qt::AlignRight);
-    field->setToolTip(QObject::tr("Zero-based image coordinate. Click Set start to apply."));
-
+    field->setToolTip(
+        QObject::tr("Zero-based image coordinate. Click Set start to apply."));
   }
   auto* set_start = new QPushButton(QObject::tr("Set start"), section);
   set_start->setAccessibleName(QObject::tr("Set start pixel"));
-  set_start->setToolTip(QObject::tr("Map this image pixel to the current stage position."));
-  auto* route_buttons = new QHBoxLayout();
-  route_buttons->setSpacing(8);
+  set_start->setToolTip(
+      QObject::tr("Map this image pixel to the current stage position."));
   settings->addWidget(set_start, 1, 2);
-  auto* preview_route = new QPushButton(QObject::tr("Preview route"), section);
-  preview_route->setAccessibleName(QObject::tr("Preview route"));
-  preview_route->setCheckable(true);
-  // Reserve both labels' width so toggling cannot redistribute the surrounding layout.
-  preview_route->ensurePolished();
-  const int preview_width = preview_route->sizeHint().width();
-  preview_route->setText(QObject::tr("Hide route"));
-  preview_route->setFixedWidth(std::max(preview_width, preview_route->sizeHint().width()));
-  preview_route->setText(QObject::tr("Preview route"));
-  preview_route->setToolTip(QObject::tr("Show or hide the algorithm route from the applied starting pixel. No hardware is moved."));
-  route_buttons->addWidget(preview_route);
   layout->addLayout(settings);
-  layout->addLayout(route_buttons);
-  auto update_start_controls = [&view, start_x, start_y, set_start, preview_route] {
+  auto update_start_controls = [&view, start_x, start_y, set_start] {
     const bool enabled = view.CanSetStartPixel();
     start_x->setEnabled(enabled);
     start_y->setEnabled(enabled);
     set_start->setEnabled(enabled);
-    preview_route->setEnabled(view.CanPreviewRoute());
-    const QSignalBlocker blocker(preview_route);
-    preview_route->setChecked(view.RoutePreviewVisible());
-    preview_route->setText(view.RoutePreviewVisible() ? QObject::tr("Hide route") : QObject::tr("Preview route"));
   };
-  QObject::connect(preview_route, &QPushButton::toggled, &view, &MainWindow::SetRoutePreviewVisible);
-  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, update_start_controls);
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section,
+                   update_start_controls);
   update_start_controls();
-  QObject::connect(set_start, &QPushButton::clicked, section, [&view, start_x, start_y] {
-    bool x_ok = false;
-    bool y_ok = false;
-    const int x = start_x->text().toInt(&x_ok);
-    const int y = start_y->text().toInt(&y_ok);
-    if (!x_ok || !y_ok || !start_x->hasAcceptableInput() || !start_y->hasAcceptableInput()) {
-      view.ShowMessage(QObject::tr("Set start: Enter nonnegative whole numbers for X and Y."), true);
-      return;
-    }
-    view.SetStartPixel(x, y);
-  });
+  QObject::connect(
+      set_start, &QPushButton::clicked, section, [&view, start_x, start_y] {
+        bool x_ok = false;
+        bool y_ok = false;
+        const int x = start_x->text().toInt(&x_ok);
+        const int y = start_y->text().toInt(&y_ok);
+        if (!x_ok || !y_ok || !start_x->hasAcceptableInput() ||
+            !start_y->hasAcceptableInput()) {
+          view.ShowMessage(
+              QObject::tr(
+                  "Set start: Enter nonnegative whole numbers for X and Y."),
+              true);
+          return;
+        }
+        view.SetStartPixel(x, y);
+      });
 
   auto* progress = new QProgressBar(section);
   progress->setRange(0, 100);
@@ -97,6 +84,12 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   progress->setMinimumHeight(26);
   progress->setAccessibleName(QObject::tr("Scan progress"));
   layout->addWidget(progress);
+
+  auto* remaining_time = new QLabel(section);
+  remaining_time->setAccessibleName(
+      QObject::tr("Estimated scan time remaining"));
+  remaining_time->setAlignment(Qt::AlignCenter);
+  layout->addWidget(remaining_time);
 
   auto* estimated_time = new QLabel(section);
   estimated_time->setAccessibleName(QObject::tr("Scan state"));
@@ -111,7 +104,8 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   start->setIcon(section->style()->standardIcon(QStyle::SP_MediaPlay));
   start->setProperty("primary", true);
   start->setAccessibleName(QObject::tr("Start scan"));
-  start->setToolTip(QObject::tr("The applied start pixel maps to the current stage position."));
+  start->setToolTip(QObject::tr(
+      "The applied start pixel maps to the current stage position."));
   start->setEnabled(false);
   start->setMinimumSize(88, 30);
   start->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -138,51 +132,89 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
 
   auto* reset = new QPushButton(QObject::tr("Reset"), section);
   reset->setAccessibleName(QObject::tr("Reset scan"));
-  reset->setToolTip(QObject::tr("Turn laser OFF, stop all motors and return to manual control. Keeps the image; clears progress and the applied starting pixel. Does not home or move to zero."));
+  reset->setToolTip(
+      QObject::tr("Turn laser OFF, stop all motors and return to manual "
+                  "control. Keeps the image; clears progress and the applied "
+                  "starting pixel. Does not home or move to zero."));
   reset->setEnabled(false);
   buttons->addWidget(reset, 1);
-  QObject::connect(reset, &QPushButton::clicked, &view, &MainWindow::RequestResetScan);
+  QObject::connect(reset, &QPushButton::clicked, &view,
+                   &MainWindow::RequestResetScan);
 
-  QObject::connect(start, &QPushButton::clicked, &view, &MainWindow::RequestScan);
-  QObject::connect(pause, &QPushButton::clicked, &view, &MainWindow::PauseScanRequested);
-  QObject::connect(resume, &QPushButton::clicked, &view, &MainWindow::ResumeScanRequested);
-  QObject::connect(stop, &QPushButton::clicked, &view, &MainWindow::CancelScanRequested);
-  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
-    using application::ScanPhase;
-    const auto phase = view.ScanPhase();
-    reset->setEnabled(view.CanResetScan());
-    const auto blockers = view.ScanStartBlockers();
-    start->setEnabled(blockers.isEmpty());
-    start->setToolTip(blockers.isEmpty()
-        ? QObject::tr("The applied start pixel maps to the current stage position.")
-        : blockers.join(QStringLiteral("\n")));
-    pause->setEnabled(view.HasBackend() && phase == ScanPhase::kRunning);
-    resume->setEnabled(view.HasBackend() && phase == ScanPhase::kPaused);
-    stop->setEnabled(view.HasBackend() && phase != ScanPhase::kIdle &&
-                     phase != ScanPhase::kFailed && phase != ScanPhase::kStopping);
-    stop->setToolTip(QObject::tr("Cancel the scan and stop its device operations."));
-  });
-  QObject::connect(&view, &MainWindow::ScanDisplayChanged, section, [=](application::ScanState state) {
-    using application::ScanPhase;
-    const int percent = state.total_instructions == 0 ? 0
-        : static_cast<int>(100.0L * std::min(state.completed_instructions, state.total_instructions)
-                           / state.total_instructions);
-    progress->setValue(percent);
-    QString phase;
-    switch (state.phase) {
-      case ScanPhase::kIdle: break;
-      case ScanPhase::kWaiting: phase = QObject::tr("Scan requested"); break;
-      case ScanPhase::kPreparing: phase = QObject::tr("Preparing"); break;
-      case ScanPhase::kRunning: phase = QObject::tr("Scanning"); break;
-      case ScanPhase::kPauseRequested: phase = QObject::tr("Pause requested"); break;
-      case ScanPhase::kPausing: phase = QObject::tr("Pausing"); break;
-      case ScanPhase::kPaused: phase = QObject::tr("Paused"); break;
-      case ScanPhase::kResuming: phase = QObject::tr("Resuming"); break;
-      case ScanPhase::kStopping: phase = QObject::tr("Stopping"); break;
-      case ScanPhase::kFailed: phase = QObject::tr("Failed"); break;
-    }
-    estimated_time->setText(phase);
-  });
+  QObject::connect(start, &QPushButton::clicked, &view,
+                   &MainWindow::RequestScan);
+  QObject::connect(pause, &QPushButton::clicked, &view,
+                   &MainWindow::PauseScanRequested);
+  QObject::connect(resume, &QPushButton::clicked, &view,
+                   &MainWindow::ResumeScanRequested);
+  QObject::connect(stop, &QPushButton::clicked, &view,
+                   &MainWindow::CancelScanRequested);
+  QObject::connect(
+      &view, &MainWindow::ScanAvailabilityChanged, section, [=, &view] {
+        using ui::ScanPhase;
+        const auto phase = view.ScanPhase();
+        reset->setEnabled(view.CanResetScan());
+        const auto blockers = view.ScanStartBlockers();
+        start->setEnabled(blockers.isEmpty());
+        start->setToolTip(blockers.isEmpty()
+                              ? QObject::tr("The applied start pixel maps to "
+                                            "the current stage position.")
+                              : blockers.join(QStringLiteral("\n")));
+        pause->setEnabled(view.HasWorkers() && phase == ScanPhase::kRunning);
+        resume->setEnabled(view.HasWorkers() && phase == ScanPhase::kPaused);
+        stop->setEnabled(view.HasWorkers() && phase != ScanPhase::kIdle &&
+                         phase != ScanPhase::kFailed &&
+                         phase != ScanPhase::kStopping);
+        stop->setToolTip(
+            QObject::tr("Cancel the scan and stop its device operations."));
+      });
+  QObject::connect(
+      &view, &MainWindow::ScanDisplayChanged, section,
+      [=](ui::ScanState state) {
+        using ui::ScanPhase;
+        const int percent =
+            state.total_instructions == 0
+                ? 0
+                : static_cast<int>(100.0L *
+                                   std::min(state.completed_instructions,
+                                            state.total_instructions) /
+                                   state.total_instructions);
+        progress->setValue(percent);
+        const bool show_estimate = state.phase == ScanPhase::kRunning ||
+                                   state.phase == ScanPhase::kPausing ||
+                                   state.phase == ScanPhase::kPaused;
+        if (!show_estimate) {
+          remaining_time->clear();
+        } else if (!state.estimated_remaining) {
+          remaining_time->setText(QObject::tr("Estimating time remaining…"));
+        } else {
+          const auto seconds = state.estimated_remaining->count();
+          remaining_time->setText(QObject::tr("About %1 min %2 sec remaining")
+                                      .arg(seconds / 60)
+                                      .arg(seconds % 60));
+        }
+        QString phase;
+        switch (state.phase) {
+          case ScanPhase::kIdle:
+            break;
+          case ScanPhase::kRunning:
+            phase = QObject::tr("Scanning");
+            break;
+          case ScanPhase::kPausing:
+            phase = QObject::tr("Pausing");
+            break;
+          case ScanPhase::kPaused:
+            phase = QObject::tr("Paused");
+            break;
+          case ScanPhase::kStopping:
+            phase = QObject::tr("Stopping");
+            break;
+          case ScanPhase::kFailed:
+            phase = QObject::tr("Failed");
+            break;
+        }
+        estimated_time->setText(phase);
+      });
 
   return section;
 }

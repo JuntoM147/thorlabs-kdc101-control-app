@@ -54,6 +54,7 @@ struct ScanProgress {
   ScanPhase phase = ScanPhase::kIdle;
   std::size_t completed_instructions = 0;
   std::size_t total_instructions = 0;
+  std::optional<std::chrono::seconds> estimated_remaining;
 };
 
 // Call once before creating queued connections between workers.

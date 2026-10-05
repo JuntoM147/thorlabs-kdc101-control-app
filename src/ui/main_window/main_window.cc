@@ -1,21 +1,19 @@
 #include "main_window/main_window.h"
 
-#include <QTabWidget>
 #include <QStringList>
-#include <QWidget>
+#include <QTabWidget>
 #include <QVBoxLayout>
-#include <utility>
-#include <exception>
+#include <QWidget>
 #include <cmath>
-#include "../../algo/algorithm/algorithm.h"
+#include <utility>
 
-#include "motor_tab/motor_information/motor_information.h"
-#include "motor_tab/motor_control/motor_control.h"
-#include "scan_tab/image/image.h"
 #include "laser_tab/laser_control/laser_control.h"
-#include "shared/status/status.h"
-#include "scan_tab/scan_control/scan_control.h"
+#include "motor_tab/motor_control/motor_control.h"
+#include "motor_tab/motor_information/motor_information.h"
 #include "options_tab/options/options.h"
+#include "scan_tab/image/image.h"
+#include "scan_tab/scan_control/scan_control.h"
+#include "shared/status/status.h"
 
 namespace ui {
 
@@ -156,40 +154,48 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   scan_layout->addWidget(CreateScanControlSection(*this, scan_page));
 
   auto* laser_layout = add_page(tr("Laser"));
-  laser_layout->addWidget(CreateLaserControlSection(*this, laser_layout->parentWidget()));
+  laser_layout->addWidget(
+      CreateLaserControlSection(*this, laser_layout->parentWidget()));
   laser_layout->addStretch();
 
   auto* options_layout = add_page(tr("Options"));
-  options_layout->addWidget(CreateOptionsSection(*this, options_layout->parentWidget()), 1);
+  options_layout->addWidget(
+      CreateOptionsSection(*this, options_layout->parentWidget()), 1);
   ConnectStatusMessages(*this);
 
-  connect(this, &MainWindow::AxisStateUpdated, this, [this](application::AxisState state) {
-    const auto index = static_cast<std::size_t>(state.axis);
-    if (index >= motor_connections_.size()) return;
-    if (motor_connections_[index] == state.connection && motor_operations_[index] == state.operation &&
-        motor_homed_[index] == state.homed) return;
-    motor_connections_[index] = state.connection;
-    motor_operations_[index] = state.operation;
-    motor_homed_[index] = state.homed;
-    emit ScanAvailabilityChanged();
-  });
-  connect(this, &MainWindow::LaserStateUpdated, this, [this](application::LaserState state) {
-    if (laser_connection_ == state.connection && laser_output_ == state.output_enabled) return;
-    laser_connection_ = state.connection;
-    laser_output_ = state.output_enabled;
-    emit ScanAvailabilityChanged();
-  });
+  connect(this, &MainWindow::AxisStateUpdated, this,
+          [this](ui::AxisState state) {
+            const auto index = static_cast<std::size_t>(state.axis);
+            if (index >= motor_connections_.size()) return;
+            if (motor_connections_[index] == state.connection &&
+                motor_operations_[index] == state.operation &&
+                motor_homed_[index] == state.homed)
+              return;
+            motor_connections_[index] = state.connection;
+            motor_operations_[index] = state.operation;
+            motor_homed_[index] = state.homed;
+            emit ScanAvailabilityChanged();
+          });
+  connect(this, &MainWindow::LaserStateUpdated, this,
+          [this](ui::LaserState state) {
+            if (laser_connection_ == state.connection &&
+                laser_output_ == state.output_enabled)
+              return;
+            laser_connection_ = state.connection;
+            laser_output_ = state.output_enabled;
+            emit ScanAvailabilityChanged();
+          });
   setCentralWidget(tabs);
-  SetBackendAvailable(false);
+  SetWorkersAvailable(false);
 }
 
-void MainWindow::SetBackendAvailable(bool available) {
-  const bool lost_backend = backend_available_ && !available;
-  backend_available_ = available;
+void MainWindow::SetWorkersAvailable(bool available) {
+  const bool lost_workers = workers_available_ && !available;
+  workers_available_ = available;
   if (!available) {
-    motor_connections_.fill(application::ConnectionState::kDisconnected);
-    laser_connection_ = application::ConnectionState::kDisconnected;
-    motor_operations_.fill(application::OperationState::kIdle);
+    motor_connections_.fill(ui::ConnectionState::kDisconnected);
+    laser_connection_ = ui::ConnectionState::kDisconnected;
+    motor_operations_.fill(ui::OperationState::kIdle);
     motor_homed_.fill(std::nullopt);
     laser_output_.reset();
     manual_requests_pending_ = false;
@@ -197,7 +203,7 @@ void MainWindow::SetBackendAvailable(bool available) {
   emit ManualControlsEnabled(available && !controls_locked_);
   emit ScanInputsEnabled(!controls_locked_);
   emit ScanAvailabilityChanged();
-  if (lost_backend) ShowMessage(tr("Application backend is not available."), true);
+  if (lost_workers) ShowMessage(tr("Workers are not available."), true);
 }
 
 void MainWindow::SetManualRequestsPending(bool pending) {
@@ -207,13 +213,12 @@ void MainWindow::SetManualRequestsPending(bool pending) {
 
 void MainWindow::SetControlsLocked(bool locked) {
   controls_locked_ = locked;
-  emit ManualControlsEnabled(backend_available_ && !locked);
+  emit ManualControlsEnabled(workers_available_ && !locked);
   emit ScanInputsEnabled(!locked);
   emit ScanAvailabilityChanged();
 }
 
 void MainWindow::SetScanImage(const QImage& image) {
-  preview_program_.clear();
   scan_image_size_ = image.size();
   start_pixel_set_ = false;
   has_pattern_ = false;
@@ -223,90 +228,69 @@ void MainWindow::SetScanImage(const QImage& image) {
     if (result && result->PixelCount() > 0) {
       scan_configuration_.pattern = std::move(*result);
       has_pattern_ = true;
-      ShowMessage(tr("Image imported. Set a start pixel before starting the scan."));
+      ShowMessage(
+          tr("Image imported. Set a start pixel before starting the scan."));
     } else {
-      ShowError({{}, "Import image", result ? "The image has no exposed pixels." : result.error()});
+      ShowError({{},
+                 "Import image",
+                 result ? "The image has no exposed pixels." : result.error()});
     }
   }
   emit ScanImageChanged(image);
-  emit RoutePreviewChanged();
   emit ScanAvailabilityChanged();
 }
 
 void MainWindow::SetStartPixel(int x, int y) {
   if (!CanSetStartPixel()) return;
-  if (x < 0 || y < 0 || x >= scan_image_size_.width() || y >= scan_image_size_.height()) {
-    ShowMessage(tr("Set start: Enter a nonnegative pixel inside the image."), true);
+  if (x < 0 || y < 0 || x >= scan_image_size_.width() ||
+      y >= scan_image_size_.height()) {
+    ShowMessage(tr("Set start: Enter a nonnegative pixel inside the image."),
+                true);
     return;
   }
   scan_configuration_.start_pixel = {x, y};
   start_pixel_set_ = true;
-  preview_program_.clear();
-  emit RoutePreviewChanged();
   ShowMessage(tr("Start pixel set to (%1, %2).").arg(x).arg(y));
   emit ScanAvailabilityChanged();
 }
 
-void MainWindow::SetRoutePreviewVisible(bool visible) {
-  if (!CanPreviewRoute()) return;
-  preview_program_.clear();
-  if (visible) {
-    try {
-      preview_program_ = algo::GenerateInstructions(scan_configuration_.start_pixel,
-                                                    scan_configuration_.pattern);
-    } catch (const std::exception& error) {
-      ShowError({{}, "Preview route", error.what()});
-    }
-  }
-  emit RoutePreviewChanged();
-  emit ScanAvailabilityChanged();
-}
-
-void MainWindow::ResetRoute() {
-  if (!CanResetRoute()) return;
-  preview_program_.clear();
-  start_pixel_set_ = false;
-  emit RoutePreviewChanged();
-  emit ScanAvailabilityChanged();
-  ShowMessage(tr("Route reset. Choose a starting pixel and click Set start."));
-}
-
 QStringList MainWindow::ScanStartBlockers() const {
   QStringList reasons;
-  if (!backend_available_) reasons << tr("Application backend is unavailable.");
-  if (controls_locked_ || scan_state_.phase != application::ScanPhase::kIdle)
+  if (!workers_available_) reasons << tr("Workers are unavailable.");
+  if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle)
     reasons << tr("Wait until the scan is idle and controls are unlocked.");
-  if (manual_requests_pending_) reasons << tr("Wait for pending manual commands to finish.");
+  if (manual_requests_pending_)
+    reasons << tr("Wait for pending manual commands to finish.");
   const QStringList axes{"X", "Y", "Z"};
   for (std::size_t i = 0; i < motor_connections_.size(); ++i) {
-    if (motor_connections_[i] != application::ConnectionState::kConnected)
+    if (motor_connections_[i] != ui::ConnectionState::kConnected)
       reasons << tr("Connect the %1 motor.").arg(axes.at(i));
-    else if (motor_operations_[i] != application::OperationState::kIdle)
+    else if (motor_operations_[i] != ui::OperationState::kIdle)
       reasons << tr("Wait until the %1 axis is idle.").arg(axes.at(i));
     else if (i < 2 && !motor_homed_[i].value_or(false))
       reasons << tr("Home the %1 axis before starting a scan.").arg(axes.at(i));
   }
-  if (laser_connection_ != application::ConnectionState::kConnected)
+  if (laser_connection_ != ui::ConnectionState::kConnected)
     reasons << tr("Connect the laser.");
   else if (!laser_output_)
     reasons << tr("Confirm the laser output is OFF; its state is unknown.");
   else if (*laser_output_)
     reasons << tr("Turn the laser output OFF.");
   if (!has_pattern_) reasons << tr("Import an image with exposed pixels.");
-  if (!std::isfinite(scan_configuration_.pixel_size_mm) || scan_configuration_.pixel_size_mm <= 0)
+  if (!std::isfinite(scan_configuration_.pixel_size_mm) ||
+      scan_configuration_.pixel_size_mm <= 0)
     reasons << tr("Enter a positive pixel size in micrometres per pixel.");
-  if (!start_pixel_set_ || scan_configuration_.start_pixel.x >= scan_image_size_.width() ||
+  if (!start_pixel_set_ ||
+      scan_configuration_.start_pixel.x >= scan_image_size_.width() ||
       scan_configuration_.start_pixel.y >= scan_image_size_.height())
     reasons << tr("Apply a valid starting pixel using Set start.");
   return reasons;
 }
 
-bool MainWindow::CanStartScan() const {
-  return ScanStartBlockers().isEmpty();
-}
+bool MainWindow::CanStartScan() const { return ScanStartBlockers().isEmpty(); }
 
 void MainWindow::SetPixelSizeMicrometres(double value) {
-  if (controls_locked_ || scan_state_.phase != application::ScanPhase::kIdle) return;
+  if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle) return;
   scan_configuration_.pixel_size_mm = value / 1000.0;
   emit ScanAvailabilityChanged();
 }
@@ -317,18 +301,19 @@ void MainWindow::RequestScan() {
   emit StartScanRequested(scan_configuration_);
 }
 
-void MainWindow::UpdateScanState(application::ScanState state) {
+void MainWindow::UpdateScanState(ui::ScanState state) {
   scan_state_ = state;
-  if (state.phase == application::ScanPhase::kWaiting) position_warning_visible_ = false;
-  if (state.phase != application::ScanPhase::kIdle) scan_has_run_ = true;
+  if (state.phase != ui::ScanPhase::kIdle) scan_has_run_ = true;
   emit ScanDisplayChanged(state);
   emit ScanAvailabilityChanged();
 }
 bool MainWindow::CanResetScan() const {
-  using application::ScanPhase;
-  return backend_available_ && !manual_requests_pending_ &&
-      (scan_state_.phase == ScanPhase::kFailed || scan_state_.phase == ScanPhase::kPaused ||
-       (scan_has_run_ && scan_state_.phase == ScanPhase::kIdle && !controls_locked_));
+  using ui::ScanPhase;
+  return workers_available_ && !manual_requests_pending_ &&
+         (scan_state_.phase == ScanPhase::kFailed ||
+          scan_state_.phase == ScanPhase::kPaused ||
+          (scan_has_run_ && scan_state_.phase == ScanPhase::kIdle &&
+           !controls_locked_));
 }
 void MainWindow::RequestResetScan() {
   if (!CanResetScan()) return;
@@ -339,9 +324,11 @@ void MainWindow::RequestResetScan() {
 void MainWindow::OnScanResetCompleted() {
   position_warning_visible_ = false;
   scan_has_run_ = false;
-  ResetRoute();
+  start_pixel_set_ = false;
   emit ScanAvailabilityChanged();
-  ShowMessage(tr("Reset complete: laser OFF, motors stopped, manual controls available. Set the starting pixel before scanning."));
+  ShowMessage(
+      tr("Reset complete: laser OFF, motors stopped, manual controls "
+         "available. Set the starting pixel before scanning."));
 }
 
 void MainWindow::ShowMessage(const QString& message, bool error) {
@@ -351,20 +338,24 @@ void MainWindow::ShowMessage(const QString& message, bool error) {
   emit StatusMessageChanged(message, error);
 }
 
-void MainWindow::ShowWarning(application::OperationError warning) {
+void MainWindow::ShowWarning(ui::OperationError warning) {
   position_warning_visible_ = true;
-  const QString axis = warning.axis
-      ? tr("Axis %1: ").arg(QStringList{"X", "Y", "Z"}.at(static_cast<int>(*warning.axis)))
-      : QString();
-  emit StatusWarningChanged(tr("Warning — ") + axis + QString::fromStdString(warning.message));
+  const QString axis = warning.axis ? tr("Axis %1: ")
+                                          .arg(QStringList{"X", "Y", "Z"}.at(
+                                              static_cast<int>(*warning.axis)))
+                                    : QString();
+  emit StatusWarningChanged(tr("Warning — ") + axis +
+                            QString::fromStdString(warning.message));
 }
 
-void MainWindow::ShowError(application::OperationError error) {
+void MainWindow::ShowError(ui::OperationError error) {
   emit OperationErrorReported(error);
-  const QString axis = error.axis
-      ? tr("Axis %1: ").arg(QStringList{"X", "Y", "Z"}.at(static_cast<int>(*error.axis)))
-      : QString();
-  ShowMessage(axis + QString::fromStdString(error.operation) +
-              ": " + QString::fromStdString(error.message), true);
+  const QString axis = error.axis ? tr("Axis %1: ")
+                                        .arg(QStringList{"X", "Y", "Z"}.at(
+                                            static_cast<int>(*error.axis)))
+                                  : QString();
+  ShowMessage(axis + QString::fromStdString(error.operation) + ": " +
+                  QString::fromStdString(error.message),
+              true);
 }
 }  // namespace ui

@@ -36,6 +36,7 @@ class MotorWorker final : public QObject {
  signals:
   void RequestFinished(workers::RequestId id, errors::Error result);
   void StateChanged(workers::MotorState state);
+  void SettingsChanged(workers::MotorSettings settings);
   void PollingFailed(errors::Error error);
   void ShutdownFinished();
 
@@ -47,6 +48,7 @@ class MotorWorker final : public QObject {
 
   void PollDevice();
   void PublishState();
+  errors::Error PublishSettings();
   void FinishMotion(errors::Error result);
   void FinishStop(errors::Error result);
   bool CheckReady(RequestId id);
