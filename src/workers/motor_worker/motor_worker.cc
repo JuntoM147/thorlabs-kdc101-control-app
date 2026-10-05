@@ -176,7 +176,10 @@ void MotorWorker::Drive(RequestId id, thorlabs::Direction direction) {
 
 void MotorWorker::Stop(RequestId id, thorlabs::StopMode mode) {
   if (!motor_) {
-    emit RequestFinished(id, errors::Error::Ok());
+    emit RequestFinished(
+        id, errors::Error::Failure(
+                errors::ErrorCode::kConnectionError,
+                "Motor is disconnected; stopping cannot be confirmed."));
     return;
   }
   if (pending_stop_) {

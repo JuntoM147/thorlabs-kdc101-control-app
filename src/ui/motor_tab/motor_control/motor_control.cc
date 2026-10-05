@@ -306,44 +306,54 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
   QObject::connect(step_size->lineEdit(), &QLineEdit::editingFinished, section,
                    submit_step);
   add_field_label(QObject::tr("Speed"), 4);
-  auto* speed = new QLineEdit(
-      QString::number(thorlabs::kDefaultMoveSpeedMmPerSecond), section);
+  auto* speed = new QComboBox(section);
+  speed->setEditable(true);
+  speed->addItems({"0.01", "0.1", "1"});
+  speed->setInsertPolicy(QComboBox::NoInsert);
+  speed->setCurrentText(
+      QString::number(thorlabs::kDefaultMoveSpeedMmPerSecond));
+  speed->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   auto* speed_validator = new QDoubleValidator(0.000001, 1000000.0, 6, speed);
   speed_validator->setNotation(QDoubleValidator::StandardNotation);
   speed_validator->setLocale(QLocale::c());
   speed->setValidator(speed_validator);
   speed->setMinimumWidth(84);
   speed->setFixedHeight(28);
-  speed->setAlignment(Qt::AlignRight);
+  speed->lineEdit()->setAlignment(Qt::AlignRight);
+  // Apply styling after sizing, in the same order as the step-size field.
+  speed->setStyleSheet(step_size->styleSheet());
   speed->setEnabled(false);
   speed->setAccessibleName(
       QObject::tr("%1 axis speed in mm per second").arg(axis));
   speed->setToolTip(
-      QObject::tr("Press Enter or leave the field to apply speed to moves, "
+      QObject::tr("Choose a preset in mm/s, or type a speed and press Enter or "
+                  "leave the field to apply it to moves, "
                   "jogging and homing."));
   inputs->addWidget(speed, 5, 0);
   inputs->addWidget(new QLabel(QObject::tr("mm/s"), section), 5, 1);
-  QObject::connect(
-      speed, &QLineEdit::editingFinished, section,
-      [&view, axis_id, axis, speed, submitted] {
-        if (!speed->isEnabled() || submitted->pending_speed) return;
-        bool ok = false;
-        const double value = QLocale::c().toDouble(speed->text(), &ok);
-        if (!ok || !speed->hasAcceptableInput() || value <= 0) {
-          view.ShowError(
-              {axis_id, "Configure speed", "Enter a positive speed in mm/s."});
-          return;
-        }
-        if (submitted->speed == value) return;
-        submitted->speed = value;
-        submitted->pending_speed = true;
-        ui::MotorSettings settings;
-        settings.move.speed_mm_per_second = value;
-        settings.jog.speed_mm_per_second = value;
-        settings.homing_speed_mm_per_second = value;
-        view.ShowMessage(QObject::tr("%1 axis: applying speed...").arg(axis));
-        emit view.ConfigureAxisRequested(axis_id, settings);
-      });
+  const auto submit_speed = [&view, axis_id, axis, speed, submitted] {
+    if (!speed->isEnabled() || submitted->pending_speed) return;
+    bool ok = false;
+    const double value = QLocale::c().toDouble(speed->currentText(), &ok);
+    if (!ok || !speed->lineEdit()->hasAcceptableInput() || value <= 0) {
+      view.ShowError(
+          {axis_id, "Configure speed", "Enter a positive speed in mm/s."});
+      return;
+    }
+    if (submitted->speed == value) return;
+    submitted->speed = value;
+    submitted->pending_speed = true;
+    ui::MotorSettings settings;
+    settings.move.speed_mm_per_second = value;
+    settings.jog.speed_mm_per_second = value;
+    settings.homing_speed_mm_per_second = value;
+    view.ShowMessage(QObject::tr("%1 axis: applying speed...").arg(axis));
+    emit view.ConfigureAxisRequested(axis_id, settings);
+  };
+  QObject::connect(speed, &QComboBox::activated, section,
+                   [submit_speed](int) { submit_speed(); });
+  QObject::connect(speed->lineEdit(), &QLineEdit::editingFinished, section,
+                   submit_speed);
   go_button->setFixedWidth(94);
   auto jog = [&view, axis_id](ui::Direction direction) {
     emit view.JogAxisRequested(axis_id, direction);
@@ -393,6 +403,7 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
     ui::AxisState state{};
     bool pending = false;
     bool stopping = false;
+    bool recovering = false;
   };
   const auto availability = std::make_shared<Availability>();
   const auto refresh = [=] {
@@ -400,7 +411,7 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
     const bool connected = state.connection == ui::ConnectionState::kConnected;
     const bool ready = connected &&
                        state.operation == ui::OperationState::kIdle &&
-                       !availability->pending;
+                       !availability->pending && !availability->recovering;
     for (auto* button : {jog_up, jog_down, home, go_button}) {
       button->setEnabled(ready);
     }
@@ -434,9 +445,14 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
                      if (settings.move.speed_mm_per_second) {
                        submitted->speed = settings.move.speed_mm_per_second;
                        submitted->pending_speed = false;
-                       speed->setText(QString::number(
+                       speed->setCurrentText(QString::number(
                            *settings.move.speed_mm_per_second, 'g', 12));
                      }
+                     refresh();
+                   });
+  QObject::connect(&view, &MainWindow::RecoveryControlsEnabled, section,
+                   [=, &view](bool) {
+                     availability->recovering = view.IsRecovering();
                      refresh();
                    });
   QObject::connect(&view, &MainWindow::OperationErrorReported, section,
@@ -462,7 +478,7 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
             availability->state.connection != ui::ConnectionState::kConnected) {
           step_size->setCurrentText(
               QString::number(thorlabs::kDefaultJogStepMm));
-          speed->setText(
+          speed->setCurrentText(
               QString::number(thorlabs::kDefaultMoveSpeedMmPerSecond));
           *submitted = SubmittedSettings{};
         }
@@ -498,7 +514,7 @@ QWidget* CreateMotorControlSection(MainWindow& view, QWidget* parent) {
   }
 
   section->setEnabled(false);
-  QObject::connect(&view, &MainWindow::ManualControlsEnabled, section,
+  QObject::connect(&view, &MainWindow::RecoveryControlsEnabled, section,
                    &QWidget::setEnabled);
 
   return section;

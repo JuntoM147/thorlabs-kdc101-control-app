@@ -140,7 +140,7 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
   }
 
   section->setEnabled(false);
-  QObject::connect(&view, &MainWindow::ManualControlsEnabled, section,
+  QObject::connect(&view, &MainWindow::RecoveryControlsEnabled, section,
                    &QWidget::setEnabled);
   return section;
 }

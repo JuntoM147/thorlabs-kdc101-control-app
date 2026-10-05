@@ -7,7 +7,6 @@
 #include <QImage>
 #include <QImageReader>
 #include <QLabel>
-#include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
 #include <QSizePolicy>
@@ -15,46 +14,10 @@
 #include <QVBoxLayout>
 #include <QWidget>
 
+#include "scan_tab/scan_preview/scan_preview.h"
+
 namespace ui {
 namespace {
-
-class ImagePreview : public QLabel {
- public:
-  explicit ImagePreview(QWidget* parent) : QLabel(parent) {
-    setText(tr("No image imported"));
-    setAlignment(Qt::AlignCenter);
-    setMinimumSize(180, 180);
-    setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
-  }
-
-  // Layout follows the available window space, never the source image
-  // dimensions.
-  QSize sizeHint() const override { return QSize(320, 240); }
-  QSize minimumSizeHint() const override { return QSize(180, 180); }
-
- protected:
-  void paintEvent(QPaintEvent* event) override {
-    const QPixmap image = pixmap();
-    if (image.isNull()) {
-      QLabel::paintEvent(event);
-      return;
-    }
-
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
-    constexpr int kImagePadding = 12;
-    const QRect available = contentsRect().adjusted(
-        kImagePadding, kImagePadding, -kImagePadding, -kImagePadding);
-    if (available.isEmpty()) return;
-    const QSize fitted =
-        image.size().scaled(available.size(), Qt::KeepAspectRatio);
-    const QRect target(available.topLeft() +
-                           QPoint((available.width() - fitted.width()) / 2,
-                                  (available.height() - fitted.height()) / 2),
-                       fitted);
-    painter.drawPixmap(target, image);
-  }
-};
 
 void ImportImage(MainWindow& view, QWidget* parent, QLabel* preview,
                  QLabel* status) {
@@ -101,7 +64,7 @@ QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
   auto* import_button = new QPushButton(QObject::tr(" Import"), section);
   import_button->setIcon(section->style()->standardIcon(QStyle::SP_FileIcon));
 
-  auto* clear_button = new QPushButton(QObject::tr("Clear"), section);
+  auto* clear_button = new QPushButton(QObject::tr("Clear image"), section);
 
   auto* toolbar = new QHBoxLayout();
   for (auto* button : {import_button, clear_button}) {
@@ -110,8 +73,7 @@ QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
   }
   toolbar->addWidget(import_button, 1);
   toolbar->addWidget(clear_button, 1);
-
-  auto* preview = new ImagePreview(section);
+  auto* preview = new ScanPreview(section);
 
   preview->setAlignment(Qt::AlignCenter);
   preview->setAccessibleName(QObject::tr("Imported image preview"));
@@ -123,7 +85,21 @@ QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
 
   layout->addLayout(toolbar);
   layout->addWidget(preview, 1);
-
+  QObject::connect(&view, &MainWindow::StartPixelChanged, preview,
+                   &ScanPreview::SetStart);
+  QObject::connect(&view, &MainWindow::PreviewScanRequested, preview,
+                   [&view, preview] {
+                     if (view.CanPreviewScan())
+                       preview->Start(view.PreviewInstructions());
+                   });
+  QObject::connect(&view, &MainWindow::StopPreviewRequested, preview,
+                   &ScanPreview::Stop);
+  QObject::connect(&view, &MainWindow::ClearPreviewRequested, preview,
+                   &ScanPreview::Clear);
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, preview,
+                   [&view, preview] {
+                     if (!view.CanPreviewScan()) preview->Stop();
+                   });
   QObject::connect(&view, &MainWindow::ScanImageChanged, preview,
                    [preview, status](const QImage& image) {
                      preview->setToolTip(QString());

@@ -10,6 +10,8 @@ add_library(frontend_ui STATIC
     motor_tab/motor_information/motor_information.h
     scan_tab/image/image.cc
     scan_tab/image/image.h
+    scan_tab/scan_preview/scan_preview.cc
+    scan_tab/scan_preview/scan_preview.h
     shared/status/status.cc
     shared/status/status.h
     scan_tab/scan_control/scan_control.cc

@@ -201,6 +201,8 @@ void MainWindow::SetWorkersAvailable(bool available) {
     manual_requests_pending_ = false;
   }
   emit ManualControlsEnabled(available && !controls_locked_);
+  emit RecoveryControlsEnabled(available &&
+                               (!controls_locked_ || IsRecovering()));
   emit ScanInputsEnabled(!controls_locked_);
   emit ScanAvailabilityChanged();
   if (lost_workers) ShowMessage(tr("Workers are not available."), true);
@@ -214,6 +216,8 @@ void MainWindow::SetManualRequestsPending(bool pending) {
 void MainWindow::SetControlsLocked(bool locked) {
   controls_locked_ = locked;
   emit ManualControlsEnabled(workers_available_ && !locked);
+  emit RecoveryControlsEnabled(workers_available_ &&
+                               (!locked || IsRecovering()));
   emit ScanInputsEnabled(!locked);
   emit ScanAvailabilityChanged();
 }
@@ -237,6 +241,7 @@ void MainWindow::SetScanImage(const QImage& image) {
     }
   }
   emit ScanImageChanged(image);
+  emit StartPixelChanged(std::nullopt);
   emit ScanAvailabilityChanged();
 }
 
@@ -250,12 +255,14 @@ void MainWindow::SetStartPixel(int x, int y) {
   }
   scan_configuration_.start_pixel = {x, y};
   start_pixel_set_ = true;
+  emit StartPixelChanged(QPoint(x, y));
   ShowMessage(tr("Start pixel set to (%1, %2).").arg(x).arg(y));
   emit ScanAvailabilityChanged();
 }
 
 QStringList MainWindow::ScanStartBlockers() const {
   QStringList reasons;
+  if (!direction_set_) reasons << tr("Choose a scan direction.");
   if (!workers_available_) reasons << tr("Workers are unavailable.");
   if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle)
     reasons << tr("Wait until the scan is idle and controls are unlocked.");
@@ -287,7 +294,26 @@ QStringList MainWindow::ScanStartBlockers() const {
   return reasons;
 }
 
+algo::Program MainWindow::PreviewInstructions() const {
+  if (!CanPreviewScan()) return {};
+  return algo::GenerateInstructions(scan_configuration_.start_pixel,
+                                    scan_configuration_.pattern,
+                                    scan_configuration_.direction);
+}
+
 bool MainWindow::CanStartScan() const { return ScanStartBlockers().isEmpty(); }
+
+void MainWindow::SetScanDirection(std::optional<algo::Direction> direction) {
+  if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle) return;
+  direction_set_ = direction.has_value();
+  if (direction) scan_configuration_.direction = *direction;
+  // Clear an animation generated for the previous direction, retaining its
+  // start dot.
+  if (start_pixel_set_)
+    emit StartPixelChanged(QPoint(scan_configuration_.start_pixel.x,
+                                  scan_configuration_.start_pixel.y));
+  emit ScanAvailabilityChanged();
+}
 
 void MainWindow::SetPixelSizeMicrometres(double value) {
   if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle) return;
@@ -303,6 +329,7 @@ void MainWindow::RequestScan() {
 
 void MainWindow::UpdateScanState(ui::ScanState state) {
   scan_state_ = state;
+  SetControlsLocked(controls_locked_);
   if (state.phase != ui::ScanPhase::kIdle) scan_has_run_ = true;
   emit ScanDisplayChanged(state);
   emit ScanAvailabilityChanged();
@@ -325,6 +352,7 @@ void MainWindow::OnScanResetCompleted() {
   position_warning_visible_ = false;
   scan_has_run_ = false;
   start_pixel_set_ = false;
+  emit StartPixelChanged(std::nullopt);
   emit ScanAvailabilityChanged();
   ShowMessage(
       tr("Reset complete: laser OFF, motors stopped, manual controls "

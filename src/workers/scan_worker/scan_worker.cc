@@ -223,6 +223,16 @@ void ScanWorker::CheckPendingRequests() {
 void ScanWorker::Pause() {
   if (progress_.phase == ScanPhase::kRunning) pause_requested_ = true;
 }
+void ScanWorker::OnMotorDisconnected(Axis axis) {
+  if (progress_.phase != ScanPhase::kRunning &&
+      progress_.phase != ScanPhase::kPausing &&
+      progress_.phase != ScanPhase::kPaused)
+    return;
+  BeginCleanup(errors::Error::Failure(
+      errors::ErrorCode::kConnectionError,
+      "Axis " + std::string(1, "XYZ"[static_cast<int>(axis)]) +
+          " disconnected during the scan."));
+}
 void ScanWorker::Resume() {
   if (progress_.phase != ScanPhase::kPaused) return;
   pause_requested_ = false;

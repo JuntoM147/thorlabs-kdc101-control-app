@@ -27,6 +27,7 @@ class ScanWorker final : public QObject {
   void OnMotorFinished(workers::Axis axis, workers::RequestId id,
                        errors::Error result);
   void OnLaserFinished(workers::RequestId id, errors::Error result);
+  void OnMotorDisconnected(workers::Axis axis);
 
  signals:
   void MoveRequested(workers::Axis axis, workers::RequestId id,

@@ -1,5 +1,6 @@
 #include "scan_control.h"
 
+#include <QComboBox>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -26,20 +27,20 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   auto* settings = new QGridLayout();
   settings->setHorizontalSpacing(16);
   settings->setVerticalSpacing(6);
-  settings->setColumnStretch(0, 1);
   settings->setColumnStretch(1, 1);
+  settings->setColumnStretch(3, 1);
   auto* start_x = new QLineEdit(QStringLiteral("0"), section);
   auto* start_y = new QLineEdit(QStringLiteral("0"), section);
   start_x->setAccessibleName(QObject::tr("Starting pixel X"));
   start_y->setAccessibleName(QObject::tr("Starting pixel Y"));
-  auto* x_label = new QLabel(QObject::tr("Starting pixel X"), section);
-  auto* y_label = new QLabel(QObject::tr("Starting pixel Y"), section);
+  auto* x_label = new QLabel(QObject::tr("Start pixel X"), section);
+  auto* y_label = new QLabel(QObject::tr("Start pixel Y"), section);
   x_label->setBuddy(start_x);
   y_label->setBuddy(start_y);
   settings->addWidget(x_label, 0, 0);
-  settings->addWidget(y_label, 0, 1);
-  settings->addWidget(start_x, 1, 0);
-  settings->addWidget(start_y, 1, 1);
+  settings->addWidget(start_x, 0, 1);
+  settings->addWidget(y_label, 0, 2);
+  settings->addWidget(start_y, 0, 3);
   for (auto* field : {start_x, start_y}) {
     field->setValidator(new QIntValidator(0, INT_MAX, field));
     field->setAlignment(Qt::AlignRight);
@@ -50,8 +51,55 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   set_start->setAccessibleName(QObject::tr("Set start pixel"));
   set_start->setToolTip(
       QObject::tr("Map this image pixel to the current stage position."));
-  settings->addWidget(set_start, 1, 2);
+  settings->addWidget(set_start, 0, 4);
   layout->addLayout(settings);
+  auto* preview_buttons = new QHBoxLayout();
+  auto* direction = new QComboBox(section);
+  direction->setAccessibleName(QObject::tr("Scan direction"));
+  direction->addItem(QObject::tr("Choose direction…"));
+  direction->addItem(QObject::tr("Left to right"),
+                     static_cast<int>(algo::Direction::kPositiveX));
+  direction->addItem(QObject::tr("Right to left"),
+                     static_cast<int>(algo::Direction::kNegativeX));
+  direction->addItem(QObject::tr("Up to down"),
+                     static_cast<int>(algo::Direction::kPositiveY));
+  direction->addItem(QObject::tr("Down to up"),
+                     static_cast<int>(algo::Direction::kNegativeY));
+  preview_buttons->addWidget(direction, 1);
+  QObject::connect(direction, &QComboBox::currentIndexChanged, section,
+                   [&view, direction](int index) {
+                     if (index == 0)
+                       view.SetScanDirection(std::nullopt);
+                     else
+                       view.SetScanDirection(static_cast<algo::Direction>(
+                           direction->currentData().toInt()));
+                   });
+  QObject::connect(&view, &MainWindow::ScanInputsEnabled, direction,
+                   &QWidget::setEnabled);
+  auto* preview_scan = new QPushButton(QObject::tr("Preview scan"), section);
+  auto* stop_preview = new QPushButton(QObject::tr("Stop preview"), section);
+  auto* clear_preview = new QPushButton(QObject::tr("Clear preview"), section);
+  for (auto* button : {preview_scan, stop_preview, clear_preview}) {
+    button->setAccessibleName(button->text());
+    preview_buttons->addWidget(button, 1);
+  }
+  layout->addLayout(preview_buttons);
+  QObject::connect(preview_scan, &QPushButton::clicked, &view,
+                   &MainWindow::PreviewScanRequested);
+  QObject::connect(stop_preview, &QPushButton::clicked, &view,
+                   &MainWindow::StopPreviewRequested);
+  QObject::connect(clear_preview, &QPushButton::clicked, &view,
+                   &MainWindow::ClearPreviewRequested);
+  const auto update_preview_controls = [&view, preview_scan, stop_preview,
+                                        clear_preview] {
+    const bool enabled = view.CanPreviewScan();
+    preview_scan->setEnabled(enabled);
+    stop_preview->setEnabled(enabled);
+    clear_preview->setEnabled(enabled);
+  };
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section,
+                   update_preview_controls);
+  update_preview_controls();
   auto update_start_controls = [&view, start_x, start_y, set_start] {
     const bool enabled = view.CanSetStartPixel();
     start_x->setEnabled(enabled);

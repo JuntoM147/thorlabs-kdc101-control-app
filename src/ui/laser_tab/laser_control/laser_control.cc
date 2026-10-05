@@ -124,12 +124,13 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
       });
   QObject::connect(status, &QCheckBox::clicked, section, [&view, status] {
     emit view.SetLaserOutputRequested(
-        status->property("outputKnown").toBool() &&
+        !view.IsRecovering() && status->property("outputKnown").toBool() &&
         !status->property("outputEnabled").toBool());
   });
   struct Availability {
     ui::LaserState state{};
     bool pending = false;
+    bool recovering = false;
   };
   const auto availability = std::make_shared<Availability>();
   const auto refresh = [=] {
@@ -143,7 +144,9 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
                                    ui::ConnectionState::kConnecting);
     channel->setEnabled(!availability->pending && !connected &&
                         state.connection != ui::ConnectionState::kConnecting);
-    status->setEnabled(connected && !availability->pending);
+    status->setEnabled(connected && !availability->pending &&
+                       (!availability->recovering || !state.output_enabled ||
+                        *state.output_enabled));
     status->setProperty("outputEnabled", state.output_enabled.value_or(false));
     status->setProperty("outputKnown", state.output_enabled.has_value());
     if (!availability->pending)
@@ -174,8 +177,13 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
                      refresh();
                    });
   manual->setEnabled(false);
-  QObject::connect(&view, &MainWindow::ManualControlsEnabled, manual,
+  QObject::connect(&view, &MainWindow::RecoveryControlsEnabled, manual,
                    &QWidget::setEnabled);
+  QObject::connect(&view, &MainWindow::RecoveryControlsEnabled, section,
+                   [=, &view](bool) {
+                     availability->recovering = view.IsRecovering();
+                     refresh();
+                   });
 
   auto* pixel_size_label =
       new QLabel(QObject::tr("Pixel size (µm/pixel)"), section);

@@ -22,17 +22,26 @@ class MainWindow : public QMainWindow {
   void SetWorkersAvailable(bool available);
   void SetScanImage(const QImage& image);
   void SetStartPixel(int x, int y);
+  void SetScanDirection(std::optional<algo::Direction> direction);
   void SetPixelSizeMicrometres(double value);
   double PixelSizeMicrometres() const {
     return scan_configuration_.pixel_size_mm * 1000.0;
   }
   bool CanStartScan() const;
+  bool CanPreviewScan() const {
+    return CanSetStartPixel() && has_pattern_ && start_pixel_set_ &&
+           direction_set_;
+  }
+  algo::Program PreviewInstructions() const;
   bool CanResetScan() const;
   QStringList ScanStartBlockers() const;
   bool CanSetStartPixel() const {
     return !controls_locked_ && !scan_image_size_.isEmpty();
   }
   bool HasWorkers() const { return workers_available_; }
+  bool IsRecovering() const {
+    return controls_locked_ && scan_state_.phase == ui::ScanPhase::kFailed;
+  }
   ui::ScanPhase ScanPhase() const { return scan_state_.phase; }
 
  public slots:
@@ -77,9 +86,14 @@ class MainWindow : public QMainWindow {
   void LaserRequestPending(bool pending);
   void ScanDisplayChanged(ui::ScanState state);
   void ManualControlsEnabled(bool enabled);
+  void RecoveryControlsEnabled(bool enabled);
   void ScanInputsEnabled(bool enabled);
   void ScanAvailabilityChanged();
   void ScanImageChanged(const QImage& image);
+  void StartPixelChanged(std::optional<QPoint> start);
+  void PreviewScanRequested();
+  void StopPreviewRequested();
+  void ClearPreviewRequested();
 
  private:
   struct PendingRequest {
@@ -97,10 +111,11 @@ class MainWindow : public QMainWindow {
       Axis axis, std::string operation,
       std::function<void(workers::MotorWorker*, workers::RequestId)> command,
       std::optional<MotorSettings> settings = std::nullopt,
-      bool stopping = false);
+      bool stopping = false, bool recovery = false);
   void SubmitLaser(
       std::string operation,
-      std::function<void(workers::LaserWorker*, workers::RequestId)> command);
+      std::function<void(workers::LaserWorker*, workers::RequestId)> command,
+      bool recovery = false);
   void FinishRequest(workers::RequestId id, errors::Error result);
   void UpdatePendingRequests();
   void PublishMotorState(Axis axis, workers::MotorState state);
@@ -120,6 +135,7 @@ class MainWindow : public QMainWindow {
   bool controls_locked_ = false;
   bool has_pattern_ = false;
   bool start_pixel_set_ = false;
+  bool direction_set_ = false;
   bool scan_has_run_ = false;
   bool position_warning_visible_ = false;
   QSize scan_image_size_;

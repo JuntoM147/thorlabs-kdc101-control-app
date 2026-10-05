@@ -6,11 +6,11 @@ namespace ui {
 void MainWindow::SubmitMotor(
     Axis axis, std::string operation,
     std::function<void(workers::MotorWorker*, workers::RequestId)> command,
-    std::optional<MotorSettings> settings, bool stopping) {
+    std::optional<MotorSettings> settings, bool stopping, bool recovery) {
   const auto index = static_cast<std::size_t>(axis);
   if (!workers_available_ || !workers_ || index >= workers_->motors.size())
     return;
-  if (controls_locked_) {
+  if (controls_locked_ && !(IsRecovering() && (stopping || recovery))) {
     ShowError({axis, operation, "Manual commands are disabled during a scan."});
     return;
   }
@@ -29,8 +29,11 @@ void MainWindow::SubmitMotor(
 
 void MainWindow::SubmitLaser(
     std::string operation,
-    std::function<void(workers::LaserWorker*, workers::RequestId)> command) {
-  if (!workers_available_ || !workers_ || controls_locked_) return;
+    std::function<void(workers::LaserWorker*, workers::RequestId)> command,
+    bool recovery) {
+  if (!workers_available_ || !workers_ ||
+      (controls_locked_ && !(IsRecovering() && recovery)))
+    return;
   for (const auto& [id, pending] : pending_requests_) {
     if (!pending.axis) return;
   }
@@ -110,22 +113,25 @@ void MainWindow::PublishMotorState(Axis axis, workers::MotorState state) {
 }
 
 void MainWindow::ConnectMotorWorker(Axis axis, workers::MotorWorker* motor) {
-  connect(
-      this, &MainWindow::ConnectMotorRequested, this,
-      [this, axis](MotorConnection connection) {
-        if (connection.axis != axis) return;
-        SubmitMotor(axis, "Connect motor", [connection](auto* motor, auto id) {
-          motor->ConnectDevice(id,
-                               QString::fromStdString(connection.serial_number),
-                               connection.simulation);
-        });
-      });
+  connect(this, &MainWindow::ConnectMotorRequested, this,
+          [this, axis](MotorConnection connection) {
+            if (connection.axis != axis) return;
+            SubmitMotor(
+                axis, "Connect motor",
+                [connection](auto* motor, auto id) {
+                  motor->ConnectDevice(
+                      id, QString::fromStdString(connection.serial_number),
+                      connection.simulation);
+                },
+                std::nullopt, false, true);
+          });
   connect(this, &MainWindow::DisconnectMotorRequested, this,
           [this, axis](Axis requested) {
             if (requested == axis)
-              SubmitMotor(axis, "Disconnect motor", [](auto* motor, auto id) {
-                motor->DisconnectDevice(id);
-              });
+              SubmitMotor(
+                  axis, "Disconnect motor",
+                  [](auto* motor, auto id) { motor->DisconnectDevice(id); },
+                  std::nullopt, false, true);
           });
   connect(this, &MainWindow::ConfigureAxisRequested, this,
           [this, axis](Axis requested, MotorSettings settings) {
@@ -180,6 +186,13 @@ void MainWindow::ConnectMotorWorker(Axis axis, workers::MotorWorker* motor) {
           [this, axis](workers::MotorSettings settings) {
             emit AxisSettingsUpdated(axis, settings);
           });
+  auto* scan = workers_->scan;
+  connect(
+      motor, &workers::MotorWorker::StateChanged, scan,
+      [scan, axis](workers::MotorState state) {
+        if (!state.connected) scan->OnMotorDisconnected(axis);
+      },
+      Qt::QueuedConnection);
   connect(motor, &workers::MotorWorker::RequestFinished, this,
           [this](auto id, errors::Error result) { FinishRequest(id, result); });
   connect(motor, &workers::MotorWorker::PollingFailed, this,
@@ -213,21 +226,27 @@ void MainWindow::ConnectScanAxis(workers::ScanWorker* scan, Axis axis,
 void MainWindow::ConnectLaserWorker(workers::LaserWorker* laser) {
   connect(this, &MainWindow::ConnectLaserRequested, this,
           [this](LaserConnection connection) {
-            SubmitLaser("Connect laser", [connection](auto* laser, auto id) {
-              laser->ConnectDevice(id, QString::fromStdString(
+            SubmitLaser(
+                "Connect laser",
+                [connection](auto* laser, auto id) {
+                  laser->ConnectDevice(id,
+                                       QString::fromStdString(
                                            connection.digital_output_channel));
-            });
+                },
+                true);
           });
   connect(this, &MainWindow::DisconnectLaserRequested, this, [this] {
-    SubmitLaser("Disconnect laser",
-                [](auto* laser, auto id) { laser->DisconnectDevice(id); });
+    SubmitLaser(
+        "Disconnect laser",
+        [](auto* laser, auto id) { laser->DisconnectDevice(id); }, true);
   });
-  connect(this, &MainWindow::SetLaserOutputRequested, this,
-          [this](bool enabled) {
-            SubmitLaser("Set laser output", [enabled](auto* laser, auto id) {
-              laser->SetOutput(id, enabled);
-            });
-          });
+  connect(
+      this, &MainWindow::SetLaserOutputRequested, this, [this](bool enabled) {
+        SubmitLaser(
+            "Set laser output",
+            [enabled](auto* laser, auto id) { laser->SetOutput(id, enabled); },
+            !enabled);
+      });
   connect(laser, &workers::LaserWorker::StateChanged, this,
           [this](workers::LaserState state) {
             emit LaserStateUpdated({state.connected
@@ -304,9 +323,9 @@ void MainWindow::ConnectScanWorker(workers::ScanWorker* scan) {
             if (!result.ok() &&
                 result.error_code() != errors::ErrorCode::kCancelled)
               ShowError({{}, "Scan", result.error_message()});
-            if (reset_requested_ && cleaned_up) {
+            if (reset_requested_) {
               reset_requested_ = false;
-              OnScanResetCompleted();
+              if (cleaned_up) OnScanResetCompleted();
             }
           });
 }
