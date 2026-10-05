@@ -1,138 +1,131 @@
 #include "algorithm.h"
-#include "instructions/instructions.h"
 
-#include <queue>
-#include <set>
-#include <utility>
+#include <vector>
 
 namespace algo {
-
 namespace {
 
-const std::vector<std::pair<int, int>> kdirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+struct Stroke {
+  PixelPosition start;
+  PixelPosition end;
+};
 
-bool IsValidPosition(const PixelPosition& pos, const BinaryMatrix& matrix) {
-    return pos.x >= 0 && pos.x < matrix.Width() && pos.y >= 0 && pos.y < matrix.Height();
-}
-
-PixelPosition BFS(const PixelPosition& start, const BinaryMatrix& matrix)
-{
-    std::queue<PixelPosition> queue;
-    // TODO: Consider unordered_set with a coordinate hash if O(log n) lookup becomes a bottleneck.
-    std::set<std::pair<int, int>> visited;
-
-    queue.push(start);
-    visited.insert({start.x, start.y});
-
-    while (!queue.empty()) {
-        PixelPosition current = queue.front();
-        queue.pop();
-
-        if (matrix.At(current.x, current.y) == 1) {
-            return current;
-        }
-
-        for (const auto& [dx, dy] : kdirs) {
-            PixelPosition next{current.x + dx, current.y + dy};
-            if (IsValidPosition(next, matrix) && !visited.contains({next.x, next.y})) {
-                queue.push(next);
-                visited.insert({next.x, next.y});
-            }
-        }
+void RowMajorOrder(const BinaryMatrix& matrix, int row, std::vector<Stroke>& strokes) {
+  int x = 0;
+  while (x < matrix.Width()) {
+    if (!matrix.At(x, row)) {
+      ++x;
+      continue;
     }
 
-    return {-1, -1}; // Return an invalid position if no 1 pixel is found
+    const PixelPosition start{x, row};
+    while (x < matrix.Width() && matrix.At(x, row)) ++x;
+    strokes.push_back({start, {x - 1, row}});
+  }
 }
 
-// Find the longest horizontal or vertical line of 1s from the starting position
-PixelPosition FindLongestLine(const PixelPosition& start, BinaryMatrix& matrix) 
-{
-    int longest_length = 0;
-    PixelPosition end = start;
-    std::pair<int, int> dir = {0, 0};
+void RowMajorOrderReverse(const BinaryMatrix& matrix, int row, std::vector<Stroke>& strokes) {
+  int x = matrix.Width() - 1;
+  while (x >= 0) {
+    if (!matrix.At(x, row)) {
+      --x;
+      continue;
+    }
+
+    const PixelPosition start{x, row};
+    while (x >= 0 && matrix.At(x, row)) --x;
+    strokes.push_back({start, {x + 1, row}});
+  }
+}
+
+void ColumnMajorOrder(const BinaryMatrix& matrix, int col, std::vector<Stroke>& strokes) {
+  int y = 0;
+  while (y < matrix.Height()) {
+    if (!matrix.At(col, y)) {
+      ++y;
+      continue;
+    }
+
+    const PixelPosition start{col, y};
+    while (y < matrix.Height() && matrix.At(col, y)) ++y;
+    strokes.push_back({start, {col, y - 1}});
+  }
+}
+
+void ColumnMajorOrderReverse(const BinaryMatrix& matrix, int col, std::vector<Stroke>& strokes) {
+  int y = matrix.Height() - 1;
+  while (y >= 0) {
+    if (!matrix.At(col, y)) {
+      --y;
+      continue;
+    }
+
+    const PixelPosition start{col, y};
+    while (y >= 0 && matrix.At(col, y)) --y;
+    strokes.push_back({start, {col, y + 1}});
+  }
+}
+
+std::vector<Stroke> FindStokes(const BinaryMatrix& matrix, Direction direction) {
+  std::vector<Stroke> strokes;
+
+  // Empty matrix, no strokes to find
+  if (matrix.Width() == 0 || matrix.Height() == 0) return strokes;
+
+  switch (direction) {
+    case Direction::kPositiveX:
+      for (int row = 0; row < matrix.Height(); ++row) {
+        RowMajorOrder(matrix, row, strokes);
+      }
+      break;
+    case Direction::kNegativeX:
+      for (int row = 0; row < matrix.Height(); ++row) {
+        RowMajorOrderReverse(matrix, row, strokes);
+      }
+      break;
+    case Direction::kPositiveY:
+      for (int col = 0; col < matrix.Width(); ++col) {
+        ColumnMajorOrder(matrix, col, strokes);
+      }
+      break;
+    case Direction::kNegativeY:
+      for (int col = 0; col < matrix.Width(); ++col) {
+        ColumnMajorOrderReverse(matrix, col, strokes);
+      }
+      break;
+  }
+
+  return strokes;
+}
+
+void MoveTo(Program& program, PixelPosition& current, PixelPosition target) {
+  const int dx = target.x - current.x;
+  const int dy = target.y - current.y;
+  if (dx != 0 || dy != 0) program.push_back(MoveRelative{dx, dy});
+  current = target;
+}
+
+}  // namespace
+
+Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix, Direction direction) {
+  const auto strokes = FindStokes(matrix, direction);
+
+  Program program{Action::kLaserOff};
+  PixelPosition current = start;
+  for (const auto& stroke : strokes) {
+    MoveTo(program, current, stroke.start);
     
-    for (const auto& [dx, dy] : kdirs) {
-        PixelPosition current = start;
-        while (IsValidPosition(current, matrix) && matrix.At(current.x, current.y) == 1) {
-            current.x += dx;
-            current.y += dy;
-        }
+    program.push_back(Action::kLaserOn);
 
-        if (longest_length < std::abs(current.x - start.x) + std::abs(current.y - start.y)) {
-            longest_length = std::abs(current.x - start.x) + std::abs(current.y - start.y);
-            end = {current.x - dx, current.y - dy}; // move back to the last valid position
-            dir = {dx, dy};
-        }
+    if (stroke.start.x == stroke.end.x && stroke.start.y == stroke.end.y) {
+      // Single pixel case
+      program.push_back(Action::kWait);
+    } else {
+      MoveTo(program, current, stroke.end);
     }
-
-    // Mark the pixels as visited to avoid counting them again
-    PixelPosition current = start;
-    while (current.x != end.x || current.y != end.y) {
-        matrix.Set(current.x, current.y, false);
-        current.x += dir.first;
-        current.y += dir.second;
-    }
-    // Mark the end pixel as well
-    matrix.Set(end.x, end.y, false);
-
-    return end;
-}
-
-} // namespace
-
-
-Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix)
-{
-    Program program;
-
-    PixelPosition current = start;
-    PixelPosition next;
-
-    // ensure the laser is off at the start
     program.push_back(Action::kLaserOff);
-
-    while (matrix.PixelCount() > 0) {
-        // Where am I currently
-        if (matrix.At(current.x, current.y) == 1) {
-            // Greedily choose the longest horizontal or vertical line of 1s
-            next = FindLongestLine(current, matrix);
-
-            // Reverse positioning may include a controller backlash overshoot and
-            // return. Reach the lower endpoint with the laser OFF, then expose
-            // the same pixels only in the positive direction.
-            PixelPosition draw_start = current;
-            PixelPosition draw_end = next;
-            if (draw_end.x < draw_start.x || draw_end.y < draw_start.y) {
-                std::swap(draw_start, draw_end);
-                program.push_back(MoveRelative{draw_start.x - current.x, draw_start.y - current.y});
-            }
-            program.push_back(Action::kLaserOn);
-
-            // Isolated pixel case
-            if (draw_end.x == draw_start.x && draw_end.y == draw_start.y) {
-                program.push_back(Action::kWait);
-            } else {
-                program.push_back(MoveRelative{draw_end.x - draw_start.x, draw_end.y - draw_start.y});
-            }
-
-            program.push_back(Action::kLaserOff);
-            next = draw_end;
-        } else {
-            // Go to nearest 1 pixel with BFS
-            next = BFS(current, matrix);
-            if (next.x == -1) {
-                break; // No more 1 pixels to visit
-            }
-
-            program.push_back(MoveRelative{next.x - current.x, next.y - current.y});
-        }
-
-        current = next;
-    }
-
-    program.push_back(Action::kLaserOff); // Ensure the laser is off at the end
-
-    return program;
+  }
+  return program;
 }
 
-} // namespace algo
+}  // namespace algo

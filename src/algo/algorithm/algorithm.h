@@ -6,7 +6,11 @@
 
 namespace algo {
 
-[[nodiscard]] Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix);
+enum class Direction { kPositiveX, kNegativeX, kPositiveY, kNegativeY };
+
+[[nodiscard]] Program GenerateInstructions(
+    PixelPosition start, BinaryMatrix matrix,
+    Direction direction = Direction::kPositiveX);
 
 }  // namespace algo
 
