@@ -17,8 +17,8 @@ The dependencies to compile and run this application are listed in the table bel
 # Build
 
 ```powershell
-cmake --preset app -DCMAKE_PREFIX_PATH=C:/Qt/6.11.2/msvc2022_64
-cmake --build --preset app
+cmake -S . -B build-vs2026 -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH=C:/Qt/6.11.2/msvc2022_64
+cmake --build build-vs2026 --config Release --target frontend
 ```
 
 

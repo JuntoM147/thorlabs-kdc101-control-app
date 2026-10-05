@@ -87,6 +87,20 @@ QWidget* CreateImageSection(MainWindow& view, QWidget* parent) {
   layout->addWidget(preview, 1);
   QObject::connect(&view, &MainWindow::StartPixelChanged, preview,
                    &ScanPreview::SetStart);
+  QObject::connect(&view, &MainWindow::ScanPreviewStarted, preview,
+                   &ScanPreview::FollowInstructions);
+  QObject::connect(&view, &MainWindow::ScanDisplayChanged, preview,
+                   [preview](ScanState state) {
+                     const auto count = state.completed_instructions +
+                                        (state.phase == ScanPhase::kRunning &&
+                                                 state.completed_instructions <
+                                                     state.total_instructions
+                                             ? 1
+                                             : 0);
+                     preview->ShowThrough(count);
+                   });
+  QObject::connect(&view, &MainWindow::ScanPreviewFinished, preview,
+                   &ScanPreview::EndFollowing);
   QObject::connect(&view, &MainWindow::PreviewScanRequested, preview,
                    [&view, preview] {
                      if (view.CanPreviewScan())

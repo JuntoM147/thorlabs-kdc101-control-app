@@ -12,7 +12,7 @@ ScanPreview::ScanPreview(QWidget* parent) : QLabel(parent) {
   setAlignment(Qt::AlignCenter);
   setMinimumSize(180, 180);
   setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
-  timer_.setInterval(30);
+  timer_.setInterval(20);
   connect(&timer_, &QTimer::timeout, this, &ScanPreview::Advance);
 }
 
@@ -26,6 +26,8 @@ void ScanPreview::SetStart(std::optional<QPoint> start) {
   target_.reset();
   drawing_ = {};
   cursor_ = start.value_or(QPoint{});
+  following_instructions_ = false;
+  cursor_visible_ = false;
   update();
 }
 
@@ -35,9 +37,47 @@ void ScanPreview::Start(algo::Program program) {
   program_ = std::move(program);
   instruction_ = 0;
   laser_on_ = false;
+  cursor_visible_ = true;
   timer_.start();
 }
 
+void ScanPreview::FollowInstructions(algo::Program program) {
+  Start(std::move(program));
+  Stop();
+  following_instructions_ = true;
+}
+
+void ScanPreview::ShowThrough(std::size_t instruction_count) {
+  if (!following_instructions_) return;
+  const auto count = std::min(instruction_count, program_.size());
+  while (instruction_ < count) {
+    const auto& instruction = program_[instruction_++];
+    if (const auto* move = std::get_if<algo::MoveRelative>(&instruction)) {
+      cursor_ += QPointF(move->dx, move->dy);
+      if (laser_on_) drawing_.lineTo(cursor_);
+    } else {
+      ApplyAction(std::get<algo::Action>(instruction));
+    }
+  }
+  update();
+}
+
+void ScanPreview::EndFollowing() { following_instructions_ = false; }
+
+void ScanPreview::ApplyAction(algo::Action action) {
+  switch (action) {
+    case algo::Action::kLaserOn:
+      laser_on_ = true;
+      drawing_.moveTo(cursor_);
+      break;
+    case algo::Action::kLaserOff:
+      laser_on_ = false;
+      break;
+    case algo::Action::kWait:
+      if (laser_on_) drawing_.addEllipse(cursor_, 0.4, 0.4);
+      break;
+  }
+}
 void ScanPreview::Advance() {
   if (instruction_ == program_.size()) {
     Stop();
@@ -48,7 +88,7 @@ void ScanPreview::Advance() {
     if (!target_) target_ = cursor_ + QPointF(move->dx, move->dy);
     const QPointF delta = *target_ - cursor_;
     const double distance = std::hypot(delta.x(), delta.y());
-    // Cross the longest image dimension in roughly four seconds.
+    // Cross the longest image dimension in roughly two and a half seconds.
     const double step =
         std::max(1.0, std::max(pixmap().width(), pixmap().height()) / 120.0);
     cursor_ = distance <= step ? *target_ : cursor_ + delta * (step / distance);
@@ -58,18 +98,7 @@ void ScanPreview::Advance() {
       ++instruction_;
     }
   } else {
-    switch (std::get<algo::Action>(instruction)) {
-      case algo::Action::kLaserOn:
-        laser_on_ = true;
-        drawing_.moveTo(cursor_);
-        break;
-      case algo::Action::kLaserOff:
-        laser_on_ = false;
-        break;
-      case algo::Action::kWait:
-        if (laser_on_) drawing_.addEllipse(cursor_, 0.4, 0.4);
-        break;
-    }
+    ApplyAction(std::get<algo::Action>(instruction));
     ++instruction_;
   }
   update();
@@ -103,7 +132,7 @@ void ScanPreview::paintEvent(QPaintEvent* event) {
     painter.setPen(Qt::white);
     painter.setBrush(QColor("#126bf0"));
     painter.drawEllipse(transform.map(QPointF(*start_)), 5, 5);
-    if (!program_.empty()) {
+    if (cursor_visible_) {
       painter.setBrush(QColor("#ff7b13"));
       painter.drawEllipse(transform.map(cursor_), 4, 4);
     }

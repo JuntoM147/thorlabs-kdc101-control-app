@@ -94,6 +94,8 @@ class MainWindow : public QMainWindow {
   void PreviewScanRequested();
   void StopPreviewRequested();
   void ClearPreviewRequested();
+  void ScanPreviewStarted(const algo::Program& program);
+  void ScanPreviewFinished();
 
  private:
   struct PendingRequest {

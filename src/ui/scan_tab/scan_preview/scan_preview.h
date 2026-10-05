@@ -9,7 +9,7 @@
 #include "algo/instructions/instructions.h"
 
 namespace ui {
-// A visual simulation only; this widget has no connection to hardware.
+// Animates instructions or shows scan progress; never commands hardware.
 class ScanPreview : public QLabel {
  public:
   explicit ScanPreview(QWidget* parent);
@@ -17,6 +17,9 @@ class ScanPreview : public QLabel {
   void Start(algo::Program program);
   void Stop();
   void Clear();
+  void FollowInstructions(algo::Program program);
+  void ShowThrough(std::size_t instruction_count);
+  void EndFollowing();
   QSize sizeHint() const override { return {320, 240}; }
   QSize minimumSizeHint() const override { return {180, 180}; }
 
@@ -25,6 +28,7 @@ class ScanPreview : public QLabel {
 
  private:
   void Advance();
+  void ApplyAction(algo::Action action);
   QTimer timer_;
   std::optional<QPoint> start_;
   algo::Program program_;
@@ -32,6 +36,8 @@ class ScanPreview : public QLabel {
   QPointF cursor_;
   std::optional<QPointF> target_;
   bool laser_on_ = false;
+  bool following_instructions_ = false;
+  bool cursor_visible_ = false;
   QPainterPath drawing_;
 };
 }  // namespace ui

@@ -56,6 +56,7 @@ struct ScanConfiguration {
   double pixel_size_mm = 0.00025;
   std::chrono::milliseconds exposure_time{10};
 };
+
 }  // namespace ui
 
 #endif  // UI_UI_TYPES_H_

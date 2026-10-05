@@ -279,6 +279,7 @@ void MainWindow::ConnectScanWorker(workers::ScanWorker* scan) {
                 configuration.direction);
             job.pixel_size_mm = configuration.pixel_size_mm;
             job.pixel_exposure = configuration.exposure_time;
+            emit ScanPreviewStarted(job.instructions);
             SetControlsLocked(
                 true);  // Lock immediately, before the queued Start executes.
             QMetaObject::invokeMethod(
@@ -313,6 +314,7 @@ void MainWindow::ConnectScanWorker(workers::ScanWorker* scan) {
           &MainWindow::UpdateScanState);
   connect(scan, &workers::ScanWorker::Finished, this,
           [this](errors::Error result) {
+            emit ScanPreviewFinished();
             // Execution errors and cleanup errors are different. Unlock only
             // when the worker confirms successful cleanup by returning to Idle.
             const bool cleaned_up = scan_state_.phase == ScanPhase::kIdle;
