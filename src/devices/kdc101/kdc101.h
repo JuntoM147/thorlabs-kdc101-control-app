@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "error/error.h"
+#include "kdc101_defaults.h"
 #include "kinesis_simulation/kinesis_simulation.h"
 
 namespace thorlabs
@@ -38,7 +39,6 @@ namespace thorlabs
         std::optional<double> acceleration_mm_per_second_squared;
     };
 
-    constexpr int kDefaultPollingIntervalMs = 200;
 
     // Represents device messages from the message queue
     enum class MotorEvent
@@ -94,6 +94,7 @@ namespace thorlabs
         [[nodiscard]] Error SetHomingSpeed(double speed_mm_per_second);
         [[nodiscard]] Error SetJogStepSize(double step_mm);
         [[nodiscard]] Error SetJogMode(JogMode mode, StopMode stop_mode);
+        [[nodiscard]] Error SetBacklash(double distance_mm);
 
         // Methods to start a motor operation (non-blocking)
         [[nodiscard]] Error StartHome();
@@ -109,6 +110,7 @@ namespace thorlabs
         [[nodiscard]] Error ClearMessageQueue();
 
     private:
+        [[nodiscard]] Error ApplyDefaults();
         KDC101(std::string serial_number, std::shared_ptr<const KinesisSimulation> simulation);
 
         const std::string serial_number_;

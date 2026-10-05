@@ -11,6 +11,7 @@ option(DEVICES_USE_FAKE_NI_DAQ "Build laser wrapper against the test SDK" OFF)
 add_library(kinesis_devices STATIC
     kdc101/kdc101.cc
     kdc101/kdc101.h
+    kdc101/kdc101_defaults.h
     kinesis_simulation/kinesis_simulation.h
 )
 target_compile_features(kinesis_devices PUBLIC cxx_std_23)

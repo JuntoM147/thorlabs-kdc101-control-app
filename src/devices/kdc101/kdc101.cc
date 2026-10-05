@@ -25,7 +25,6 @@ namespace thorlabs
 
     constexpr int kDeviceID = 27; // KDC101 Device ID (from Thorlabs Kinesis C API)
     constexpr size_t kDeviceListBufferSize = 250;
-    constexpr char kStageID[] = "Z825";
 
     namespace
     {
@@ -95,9 +94,10 @@ namespace thorlabs
 
         Error LoadSettings(const std::string &serial_number)
         {
-            if (!CC_LoadSettings(serial_number.c_str()) && !CC_LoadNamedSettings(serial_number.c_str(), kStageID))
+            // Use the known actuator profile, not a previously saved stage selection.
+            if (!CC_LoadNamedSettings(serial_number.c_str(), kDefaultStageSettings))
             {
-                return Error::FailedToLoadSettings(serial_number).WithContext("CC_LoadSettings / CC_LoadNamedSettings");
+                return Error::FailedToLoadSettings(serial_number).WithContext("CC_LoadNamedSettings(Z825)");
             }
 
             return Error::Ok();
@@ -179,7 +179,35 @@ namespace thorlabs
 
         device->polling_ = true;
 
+        status = device->ApplyDefaults();
+        if (!status.ok())
+        {
+            return std::unexpected(status.WithContext("Apply KDC101 defaults"));
+        }
+
         return device;
+    }
+
+    Error KDC101::ApplyDefaults()
+    {
+        auto status = SetMoveVelocity({kDefaultMoveSpeedMmPerSecond,
+                                       kDefaultMoveAccelerationMmPerSecondSquared});
+        if (!status.ok()) return status.WithContext("Set move velocity");
+
+        status = SetJogVelocity({kDefaultJogSpeedMmPerSecond,
+                                 kDefaultJogAccelerationMmPerSecondSquared});
+        if (!status.ok()) return status.WithContext("Set jog velocity");
+
+        status = SetHomingSpeed(kDefaultHomingSpeedMmPerSecond);
+        if (!status.ok()) return status.WithContext("Set homing speed");
+
+        status = SetJogStepSize(kDefaultJogStepMm);
+        if (!status.ok()) return status.WithContext("Set jog step");
+
+        status = SetJogMode(JogMode::kSingleStep, StopMode::kProfiled);
+        if (!status.ok()) return status.WithContext("Set jog mode");
+
+        return SetBacklash(kDefaultBacklashMm).WithContext("Set backlash");
     }
 
     KDC101::~KDC101()
@@ -324,6 +352,22 @@ namespace thorlabs
         }
 
         return Error::FromKinesis(CC_SetHomingVelocity(serial_number_.c_str(), static_cast<unsigned int>(*converted)));
+    }
+
+    Error KDC101::SetBacklash(double distance_mm)
+    {
+        if (!std::isfinite(distance_mm) || distance_mm < 0.0)
+        {
+            return Error::InvalidArgument("Backlash must be a finite, non-negative distance in mm.");
+        }
+        if (distance_mm == 0.0)
+        {
+            return Error::FromKinesis(CC_SetBacklash(serial_number_.c_str(), 0));
+        }
+
+        auto converted = ConvertMotionParameter(serial_number_, distance_mm, kUnitTypeDistance);
+        if (!converted) return converted.error();
+        return Error::FromKinesis(CC_SetBacklash(serial_number_.c_str(), *converted));
     }
 
     Error KDC101::SetJogStepSize(double step)
