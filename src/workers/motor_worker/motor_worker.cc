@@ -6,7 +6,7 @@
 namespace workers {
 namespace {
 constexpr int kPollIntervalMs = thorlabs::kDefaultPollingIntervalMs;
-// A full 25 mm move at the default 0.01 mm/s takes about 42 minutes.
+// Allow long moves at speeds below the default 0.1 mm/s.
 constexpr int kMotionTimeoutMs = 60 * 60 * 1000;
 constexpr int kStopTimeoutMs = 5000;
 

@@ -261,11 +261,8 @@ Error ApplyVelocity(const std::string& serial_number, VelocityParameters update,
       jog ? CC_GetJogVelParams(serial, &device_acceleration, &device_speed)
           : CC_GetVelParams(serial, &device_acceleration, &device_speed));
   if (!status.ok()) return status;
-  // Compare device units, so equivalent real values do not cause redundant
-  // writes.
-  if (speed.value_or(device_speed) == device_speed &&
-      acceleration.value_or(device_acceleration) == device_acceleration)
-    return Error::Ok();
+  // Explicit updates must reach the controller even if the SDK's cached
+  // parameters already match. Preserve only fields omitted by the caller.
   return Error::FromKinesis(
       jog ? CC_SetJogVelParams(serial,
                                acceleration.value_or(device_acceleration),

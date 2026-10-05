@@ -1,5 +1,6 @@
 #include "motor_control.h"
 
+#include <QAbstractItemView>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QDoubleValidator>
@@ -14,7 +15,9 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QSizePolicy>
+#include <QTimer>
 #include <QVBoxLayout>
+#include <cmath>
 #include <initializer_list>
 #include <memory>
 
@@ -331,16 +334,17 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
                   "jogging and homing."));
   inputs->addWidget(speed, 5, 0);
   inputs->addWidget(new QLabel(QObject::tr("mm/s"), section), 5, 1);
-  const auto submit_speed = [&view, axis_id, axis, speed, submitted] {
+  const auto submit_speed = [&view, axis_id, axis, speed, submitted](
+                                const QString& text, bool preset = false) {
     if (!speed->isEnabled() || submitted->pending_speed) return;
     bool ok = false;
-    const double value = QLocale::c().toDouble(speed->currentText(), &ok);
-    if (!ok || !speed->lineEdit()->hasAcceptableInput() || value <= 0) {
+    const double value = QLocale::c().toDouble(text, &ok);
+    if (!ok || !std::isfinite(value) || value <= 0) {
       view.ShowError(
           {axis_id, "Configure speed", "Enter a positive speed in mm/s."});
       return;
     }
-    if (submitted->speed == value) return;
+    if (!preset && submitted->speed == value) return;
     submitted->speed = value;
     submitted->pending_speed = true;
     ui::MotorSettings settings;
@@ -351,9 +355,19 @@ QWidget* CreateAxisControl(MainWindow& view, ui::Axis axis_id,
     emit view.ConfigureAxisRequested(axis_id, settings);
   };
   QObject::connect(speed, &QComboBox::activated, section,
-                   [submit_speed](int) { submit_speed(); });
+                   [speed, submit_speed](int index) {
+                     submit_speed(speed->itemText(index), true);
+                   });
   QObject::connect(speed->lineEdit(), &QLineEdit::editingFinished, section,
-                   submit_speed);
+                   [speed, section, submit_speed] {
+                     // Opening the dropdown also ends editing. Wait until Qt
+                     // has processed that focus change before applying typed
+                     // text.
+                     QTimer::singleShot(0, section, [speed, submit_speed] {
+                       if (!speed->view()->isVisible())
+                         submit_speed(speed->currentText());
+                     });
+                   });
   go_button->setFixedWidth(94);
   auto jog = [&view, axis_id](ui::Direction direction) {
     emit view.JogAxisRequested(axis_id, direction);
