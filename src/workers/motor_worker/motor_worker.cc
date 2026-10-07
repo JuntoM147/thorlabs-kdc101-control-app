@@ -1,7 +1,5 @@
 #include "motor_worker.h"
-#include "position_tolerance.h"
 
-#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -138,7 +136,6 @@ void MotorWorker::StartMotion(RequestId id, thorlabs::MotorEvent completion,
     return;
   }
   pending_motion_ = PendingMotion{id, completion};
-  motion_elapsed_.start();
   if (!continuous) motion_timer_->start(kMotionTimeoutMs);
   PublishState();
 }
@@ -165,62 +162,20 @@ void MotorWorker::CapturePosition(RequestId id) {
 }
 void MotorWorker::MoveAbsolute(RequestId id, double position_mm) {
   if (!CheckReady(id)) return;
+  // Skip unchanged targets, which may not emit a completion event.
   if (motor_ && !pending_motion_ && !pending_stop_ &&
       std::isfinite(position_mm)) {
     auto position = motor_->GetPosition();
-    if (position && WithinPositionTolerance(*position, position_mm)) {
-      const auto cleared = motor_->ClearMessageQueue();
-      if (!cleared.ok()) {
-        emit RequestFinished(id, cleared);
-        return;
-      }
-      pending_motion_ = PendingMotion{id, thorlabs::MotorEvent::kMoveCompleted,
-                                      true, true, 0, position_mm};
-      motion_elapsed_.start();
-      motion_timer_->start(kStopTimeoutMs);
+    auto resolution = motor_->GetDistanceResolution();
+    if (position && resolution &&
+        std::abs(*position - position_mm) < *resolution / 2) {
+      emit RequestFinished(id, errors::Error::Ok());
       return;
     }
   }
   StartMotion(id, thorlabs::MotorEvent::kMoveCompleted, [this, position_mm] {
     return motor_->StartMoveAbsolute(position_mm);
   });
-  if (pending_motion_) {
-    pending_motion_->confirm_idle = true;
-    pending_motion_->target_mm = position_mm;
-  }
-}
-void MotorWorker::CheckAbsolutePosition() {
-  if (!pending_motion_ || !pending_motion_->target_mm || pending_stop_) return;
-  const auto position = motor_->GetPosition();
-  if (!position) {
-    FinishMotion(position.error());
-    return;
-  }
-  if (!std::isfinite(*position)) {
-    FinishMotion(errors::Error::InvalidArgument("Motor position is not finite."));
-    return;
-  }
-  const double target = *pending_motion_->target_mm;
-  if (WithinPositionTolerance(*position, target)) {
-    FinishMotion(errors::Error::Ok());
-    return;
-  }
-  const auto remaining = kMotionTimeoutMs - motion_elapsed_.elapsed();
-  if (remaining <= 0) {
-    OnTimeout();
-    return;
-  }
-  // Replay only this axis's move, retaining its request ID and original deadline.
-  // Clear old events before reissuing so they cannot complete the retry.
-  auto result = motor_->ClearMessageQueue();
-  if (result.ok()) result = motor_->StartMoveAbsolute(target);
-  if (!result.ok()) {
-    FinishMotion(result);
-    return;
-  }
-  pending_motion_->completion_received = false;
-  pending_motion_->idle_polls = 0;
-  motion_timer_->start(static_cast<int>(remaining));
 }
 void MotorWorker::MoveRelative(RequestId id, double distance_mm) {
   StartMotion(id, thorlabs::MotorEvent::kMoveCompleted, [this, distance_mm] {
@@ -320,13 +275,6 @@ void MotorWorker::PollDevice() {
     // two polling ticks before acknowledging the stop request.
     if (stop_idle_polls_ >= 2) FinishStop(errors::Error::Ok());
   }
-  if (!pending_stop_ && pending_motion_ && pending_motion_->confirm_idle &&
-      pending_motion_->completion_received) {
-    auto& motion = *pending_motion_;
-    motion.idle_polls = IsMoving(*status) ? 0 : motion.idle_polls + 1;
-    // Start on the tick after completion, allowing cached status to refresh.
-    if (motion.idle_polls >= 2) CheckAbsolutePosition();
-  }
   // Bound queue draining so other queued commands, especially Stop, can run.
   for (int i = 0; i < 64; ++i) {
     auto event = motor_->GetNextEvent();
@@ -340,19 +288,9 @@ void MotorWorker::PollDevice() {
     if (pending_stop_)
       continue;  // Confirm stopping through status, not a stale event.
     if (!pending_motion_) continue;
-    if (**event == pending_motion_->completion_event) {
-      if (pending_motion_->confirm_idle &&
-          !pending_motion_->completion_received) {
-        pending_motion_->completion_received = true;
-        const auto remaining = kMotionTimeoutMs - motion_elapsed_.elapsed();
-        if (remaining <= 0) {
-          OnTimeout();
-          return;
-        }
-        motion_timer_->start(static_cast<int>(std::min<qint64>(kStopTimeoutMs, remaining)));
-      } else if (!pending_motion_->confirm_idle)
-        FinishMotion(errors::Error::Ok());
-    }
+    // Let scanning turn the laser off without extra idle polls or retries.
+    if (**event == pending_motion_->completion_event)
+      FinishMotion(errors::Error::Ok());
     else if (**event == thorlabs::MotorEvent::kStopped)
       FinishMotion(
           errors::Error::Failure(errors::ErrorCode::kCancelled,

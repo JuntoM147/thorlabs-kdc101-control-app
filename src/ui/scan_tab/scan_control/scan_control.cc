@@ -77,26 +77,11 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
   auto* preview_buttons = new QHBoxLayout();
   auto* direction = new QComboBox(section);
   direction->setAccessibleName(QObject::tr("Scan direction"));
-  direction->addItem(QObject::tr("Choose direction…"));
   direction->addItem(QObject::tr("Left to right"),
                      static_cast<int>(algo::Direction::kPositiveX));
-  direction->addItem(QObject::tr("Right to left"),
-                     static_cast<int>(algo::Direction::kNegativeX));
-  direction->addItem(QObject::tr("Up to down"),
-                     static_cast<int>(algo::Direction::kPositiveY));
-  direction->addItem(QObject::tr("Down to up"),
-                     static_cast<int>(algo::Direction::kNegativeY));
+  direction->setEnabled(false);
+  direction->setToolTip(QObject::tr("Scanning is fixed to left to right."));
   preview_buttons->addWidget(direction, 1);
-  QObject::connect(direction, &QComboBox::currentIndexChanged, section,
-                   [&view, direction](int index) {
-                     if (index == 0)
-                       view.SetScanDirection(std::nullopt);
-                     else
-                       view.SetScanDirection(static_cast<algo::Direction>(
-                           direction->currentData().toInt()));
-                   });
-  QObject::connect(&view, &MainWindow::ScanInputsEnabled, direction,
-                   &QWidget::setEnabled);
   auto* preview_scan = new QPushButton(QObject::tr("Preview scan"), section);
   auto* stop_preview = new QPushButton(QObject::tr("Stop preview"), section);
   auto* clear_preview = new QPushButton(QObject::tr("Clear preview"), section);

@@ -262,7 +262,6 @@ void MainWindow::SetStartPixel(int x, int y) {
 
 QStringList MainWindow::ScanStartBlockers() const {
   QStringList reasons;
-  if (!direction_set_) reasons << tr("Choose a scan direction.");
   if (!workers_available_) reasons << tr("Workers are unavailable.");
   if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle)
     reasons << tr("Wait until the scan is idle and controls are unlocked.");
@@ -303,18 +302,6 @@ algo::Program MainWindow::PreviewInstructions() const {
 }
 
 bool MainWindow::CanStartScan() const { return ScanStartBlockers().isEmpty(); }
-
-void MainWindow::SetScanDirection(std::optional<algo::Direction> direction) {
-  if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle) return;
-  direction_set_ = direction.has_value();
-  if (direction) scan_configuration_.direction = *direction;
-  // Clear an animation generated for the previous direction, retaining its
-  // start dot.
-  if (start_pixel_set_)
-    emit StartPixelChanged(QPoint(scan_configuration_.start_pixel.x,
-                                  scan_configuration_.start_pixel.y));
-  emit ScanAvailabilityChanged();
-}
 
 void MainWindow::SetPixelSizeMicrometres(double value) {
   if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle) return;

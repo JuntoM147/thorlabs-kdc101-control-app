@@ -23,7 +23,6 @@ class MainWindow : public QMainWindow {
   void SetWorkersAvailable(bool available);
   void SetScanImage(const QImage& image);
   void SetStartPixel(int x, int y);
-  void SetScanDirection(std::optional<algo::Direction> direction);
   void SetPixelSizeMicrometres(double value);
   double PixelSizeMicrometres() const {
     return scan_configuration_.pixel_size_mm * 1000.0;
@@ -35,7 +34,7 @@ class MainWindow : public QMainWindow {
   }
   bool CanPreviewScan() const {
     return CanSetStartPixel() && has_pattern_ && start_pixel_set_ &&
-           direction_set_ && std::isfinite(scan_configuration_.pixel_size_mm) &&
+           std::isfinite(scan_configuration_.pixel_size_mm) &&
            scan_configuration_.pixel_size_mm > 0;
   }
   algo::Program PreviewInstructions() const;
@@ -143,7 +142,6 @@ class MainWindow : public QMainWindow {
   bool controls_locked_ = false;
   bool has_pattern_ = false;
   bool start_pixel_set_ = false;
-  bool direction_set_ = false;
   bool scan_has_run_ = false;
   bool position_warning_visible_ = false;
   QSize scan_image_size_;

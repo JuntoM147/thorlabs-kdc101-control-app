@@ -39,6 +39,8 @@ void ScanWorker::Start(ScanJob job) {
     return;
   }
   // Validate the program before any motor or laser requests are emitted.
+  bool laser_on = false;
+  std::optional<algo::MoveAbsolute> previous_move;
   for (const auto& instruction : job.instructions) {
     if (const auto* move = std::get_if<algo::MoveAbsolute>(&instruction)) {
       if (!std::isfinite(move->x_mm) || !std::isfinite(move->y_mm)) {
@@ -46,6 +48,14 @@ void ScanWorker::Start(ScanJob job) {
             "Scan move exceeds the supported distance."));
         return;
       }
+      // Exposed moves must be +X only: execution intentionally omits Y.
+      if (laser_on && (!previous_move || move->y_mm != previous_move->y_mm ||
+                       move->x_mm <= previous_move->x_mm)) {
+        emit Finished(errors::Error::InvalidArgument(
+            "Exposed scan moves must travel left to right without changing Y."));
+        return;
+      }
+      previous_move = *move;
     } else {
       const auto action = std::get<algo::Action>(instruction);
       if (action != algo::Action::kLaserOn &&
@@ -53,6 +63,8 @@ void ScanWorker::Start(ScanJob job) {
         emit Finished(errors::Error::InvalidArgument("Unknown scan action."));
         return;
       }
+      if (action == algo::Action::kLaserOn) laser_on = true;
+      if (action == algo::Action::kLaserOff) laser_on = false;
     }
   }
   job_ = std::move(job);
@@ -133,9 +145,12 @@ void ScanWorker::ExecuteNextInstruction() {
       BeginCleanup(errors::Error::InvalidArgument("Scan target is not finite."));
       return;
     }
-    // Allocate both IDs before emitting; diagonal moves wait for both axes.
+    // Reposition both axes with the laser off. During exposure, keep Y
+    // untouched; even reissuing its current target can trigger compensation.
+    // Allocate all needed IDs before emitting to support immediate replies.
     pending_x_ = NextRequestId();
-    pending_y_ = NextRequestId();
+    pending_y_ = program_laser_on_ ? std::nullopt
+                                 : std::optional<RequestId>{NextRequestId()};
     operation_timer_->start(static_cast<int>(job_.motion_timeout.count()));
     if (pending_x_)
       emit MoveRequested(Axis::kX, *pending_x_, x);

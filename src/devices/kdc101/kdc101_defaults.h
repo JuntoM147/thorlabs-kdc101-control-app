@@ -13,7 +13,11 @@ inline constexpr double kDefaultJogSpeedMmPerSecond = 0.1;  // 100 um/s
 inline constexpr double kDefaultJogAccelerationMmPerSecondSquared = 1.0;
 inline constexpr double kDefaultJogStepMm = 0.1;
 inline constexpr double kDefaultHomingSpeedMmPerSecond = 0.1;
-inline constexpr double kDefaultBacklashMm = 0.0;
+// Experimental Z825 compensation overshoot: 100 um, independent of pixel size.
+// Reduced from the documented Z825B 300 um compensation distance.
+// https://www.thorlabs.com/catalogpages/Obsolete/2023/Z825B.pdf
+// Negative moves can overshoot before returning; expose in the positive direction.
+inline constexpr double kDefaultBacklashMm = 0.1;
 
 }  // namespace thorlabs
 

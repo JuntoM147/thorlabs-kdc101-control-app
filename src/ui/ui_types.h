@@ -52,7 +52,7 @@ struct OperationError {
 struct ScanConfiguration {
   algo::BinaryMatrix pattern;
   algo::PixelPosition start_pixel;
-  algo::Direction direction = algo::Direction::kPositiveX;
+  static constexpr algo::Direction direction = algo::Direction::kPositiveX;
   double pixel_size_mm = 0.00025;
   std::chrono::milliseconds exposure_time{10};
 };

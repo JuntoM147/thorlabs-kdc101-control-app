@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
-#include <QElapsedTimer>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -47,10 +46,6 @@ class MotorWorker final : public QObject {
   struct PendingMotion {
     RequestId id;
     thorlabs::MotorEvent completion_event;
-    bool confirm_idle = false;
-    bool completion_received = false;
-    int idle_polls = 0;
-    std::optional<double> target_mm;
   };
 
   void PollDevice();
@@ -63,7 +58,6 @@ class MotorWorker final : public QObject {
                    std::function<errors::Error()> command,
                    bool continuous = false);
   void OnTimeout();
-  void CheckAbsolutePosition();
 
   std::unique_ptr<thorlabs::KDC101> motor_;
   std::shared_ptr<const thorlabs::KinesisSimulation> simulation_;
@@ -72,7 +66,6 @@ class MotorWorker final : public QObject {
   std::optional<PendingMotion> pending_motion_;
   std::optional<RequestId> pending_stop_;
   QTimer* motion_timer_ = nullptr;
-  QElapsedTimer motion_elapsed_;
   bool shutting_down_ = false;
   int stop_idle_polls_ = 0;
 };
