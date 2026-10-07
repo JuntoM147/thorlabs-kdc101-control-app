@@ -28,10 +28,13 @@ class ScanWorker final : public QObject {
                        errors::Error result);
   void OnLaserFinished(workers::RequestId id, errors::Error result);
   void OnMotorDisconnected(workers::Axis axis);
+  void OnPositionCaptured(workers::Axis axis, workers::RequestId id,
+                          double position_mm);
 
  signals:
+  void PositionRequested(workers::Axis axis, workers::RequestId id);
   void MoveRequested(workers::Axis axis, workers::RequestId id,
-                     double distance_mm);
+                     double position_mm);
   void StopRequested(workers::Axis axis, workers::RequestId id,
                      thorlabs::StopMode mode);
   void LaserOutputRequested(workers::RequestId id, bool enabled);
@@ -54,6 +57,9 @@ class ScanWorker final : public QObject {
   void RequestLaser(bool enabled);
 
   ScanJob job_;
+  bool capturing_origin_ = false;
+  double origin_x_mm_ = 0;
+  double origin_y_mm_ = 0;
   ScanProgress progress_;
   bool pause_requested_ = false;
   bool shutdown_requested_ = false;

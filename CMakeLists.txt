@@ -23,6 +23,18 @@ add_subdirectory(src/algo)
 add_subdirectory(src/workers)
 add_subdirectory(src/ui)
 
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(scan_pixel_size_tests tests/scan_pixel_size_tests.cc
+        src/workers/scan_worker/scan_worker.cc
+        src/workers/scan_worker/scan_worker.h)
+    target_include_directories(scan_pixel_size_tests PRIVATE
+        "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/src/devices"
+        "${KINESIS_INCLUDE_DIR}")
+    target_link_libraries(scan_pixel_size_tests PRIVATE algo_algorithm project_error Qt6::Core)
+    add_test(NAME scan_pixel_size COMMAND scan_pixel_size_tests)
+endif()
+
 # One executable. The subdirectories define its supporting libraries only.
 qt_add_executable(frontend WIN32 src/main.cc)
 target_link_libraries(frontend PRIVATE frontend_ui worker_interfaces)

@@ -9,7 +9,9 @@ namespace algo {
 enum class Direction { kPositiveX, kNegativeX, kPositiveY, kNegativeY };
 
 [[nodiscard]] Program GenerateInstructions(
-    PixelPosition start, BinaryMatrix matrix,
+    PixelPosition start,
+    BinaryMatrix matrix,
+    double pixel_size_mm,
     Direction direction = Direction::kPositiveX);
 
 }  // namespace algo

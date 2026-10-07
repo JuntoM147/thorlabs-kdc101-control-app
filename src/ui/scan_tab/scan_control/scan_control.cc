@@ -14,6 +14,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <climits>
+#include <cmath>
 
 namespace ui {
 
@@ -53,6 +54,26 @@ QWidget* CreateScanControlSection(MainWindow& view, QWidget* parent) {
       QObject::tr("Map this image pixel to the current stage position."));
   settings->addWidget(set_start, 0, 4);
   layout->addLayout(settings);
+  auto* physical_size = new QLabel(section);
+  physical_size->setAccessibleName(QObject::tr("Physical scan size"));
+  physical_size->setToolTip(QObject::tr(
+      "Image width and height multiplied by pixel size. Motor targets refer "
+      "to pixel centres."));
+  const auto update_physical_size = [&view, physical_size] {
+    const auto size = view.ScanSizeMillimetres();
+    if (!std::isfinite(size.width()) || !std::isfinite(size.height()) ||
+        size.width() <= 0 || size.height() <= 0) {
+      physical_size->setText(QObject::tr("Physical size: set an image and valid pixel size."));
+    } else {
+      physical_size->setText(QObject::tr("Physical size: %1 × %2 mm (%3 µm/pixel)")
+          .arg(size.width(), 0, 'g', 8).arg(size.height(), 0, 'g', 8)
+          .arg(view.PixelSizeMicrometres(), 0, 'g', 8));
+    }
+  };
+  QObject::connect(&view, &MainWindow::ScanAvailabilityChanged, section,
+                   update_physical_size);
+  update_physical_size();
+  layout->addWidget(physical_size);
   auto* preview_buttons = new QHBoxLayout();
   auto* direction = new QComboBox(section);
   direction->setAccessibleName(QObject::tr("Scan direction"));

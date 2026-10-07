@@ -40,7 +40,7 @@ struct LaserState {
 
 struct ScanJob {
   algo::Program instructions;
-  double pixel_size_mm = 0.00025;                // 0.25 um per image pixel.
+  // Instructions already contain physical targets scaled by pixel size.
   std::chrono::milliseconds pixel_exposure{10};  // Isolated pixel dwell.
   std::chrono::milliseconds operation_timeout{30000};
   // Slow drawing can legitimately take minutes; laser writes/cleanup retain

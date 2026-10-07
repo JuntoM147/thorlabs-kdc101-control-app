@@ -1,6 +1,8 @@
 #include "algorithm.h"
 
 #include <vector>
+#include <cmath>
+#include <stdexcept>
 
 namespace algo {
 namespace {
@@ -10,7 +12,8 @@ struct Stroke {
   PixelPosition end;
 };
 
-void RowMajorOrder(const BinaryMatrix& matrix, int row,
+void RowMajorOrder(const BinaryMatrix& matrix,
+                   int row,
                    std::vector<Stroke>& strokes) {
   int x = 0;
   while (x < matrix.Width()) {
@@ -103,23 +106,24 @@ std::vector<Stroke> FindStokes(const BinaryMatrix& matrix,
   return strokes;
 }
 
-void MoveTo(Program& program, PixelPosition& current, PixelPosition target) {
-  const int dx = target.x - current.x;
-  const int dy = target.y - current.y;
-  if (dx != 0 || dy != 0) program.push_back(MoveRelative{dx, dy});
-  current = target;
-}
-
 }  // namespace
 
-Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix,
+Program GenerateInstructions(PixelPosition start,
+                             BinaryMatrix matrix,
+                             double pixel_size_mm,
                              Direction direction) {
+  if (!std::isfinite(pixel_size_mm) || pixel_size_mm <= 0)
+    throw std::invalid_argument("Pixel size must be positive and finite.");
   const auto strokes = FindStokes(matrix, direction);
 
   Program program{Action::kLaserOff};
-  PixelPosition current = start;
+  const auto move_to = [start, pixel_size_mm](PixelPosition target) {
+    return MoveAbsolute{target.x, target.y,
+                        (double(target.x) - start.x) * pixel_size_mm,
+                        (double(target.y) - start.y) * pixel_size_mm};
+  };
   for (const auto& stroke : strokes) {
-    MoveTo(program, current, stroke.start);
+    program.push_back(move_to(stroke.start));
 
     program.push_back(Action::kLaserOn);
 
@@ -127,7 +131,7 @@ Program GenerateInstructions(PixelPosition start, BinaryMatrix matrix,
       // Single pixel case
       program.push_back(Action::kWait);
     } else {
-      MoveTo(program, current, stroke.end);
+      program.push_back(move_to(stroke.end));
     }
     program.push_back(Action::kLaserOff);
   }

@@ -298,6 +298,7 @@ algo::Program MainWindow::PreviewInstructions() const {
   if (!CanPreviewScan()) return {};
   return algo::GenerateInstructions(scan_configuration_.start_pixel,
                                     scan_configuration_.pattern,
+                                    scan_configuration_.pixel_size_mm,
                                     scan_configuration_.direction);
 }
 
@@ -318,6 +319,10 @@ void MainWindow::SetScanDirection(std::optional<algo::Direction> direction) {
 void MainWindow::SetPixelSizeMicrometres(double value) {
   if (controls_locked_ || scan_state_.phase != ui::ScanPhase::kIdle) return;
   scan_configuration_.pixel_size_mm = value / 1000.0;
+  // Clear an animation generated with the previous physical scale.
+  if (start_pixel_set_)
+    emit StartPixelChanged(QPoint(scan_configuration_.start_pixel.x,
+                                  scan_configuration_.start_pixel.y));
   emit ScanAvailabilityChanged();
 }
 

@@ -28,22 +28,20 @@ void ScanWorker::Start(ScanJob job) {
   if (shutdown_requested_ || progress_.phase != ScanPhase::kIdle) return;
   EnsureTimers();
   const auto max_interval = std::numeric_limits<int>::max();
-  if (!std::isfinite(job.pixel_size_mm) || job.pixel_size_mm <= 0 ||
-      job.pixel_exposure.count() <= 0 ||
+  if (job.pixel_exposure.count() <= 0 ||
       job.pixel_exposure.count() > max_interval ||
       job.operation_timeout.count() <= 0 ||
       job.operation_timeout.count() > max_interval ||
       job.motion_timeout.count() <= 0 ||
       job.motion_timeout.count() > max_interval) {
     emit Finished(errors::Error::InvalidArgument(
-        "Scan scale and timer intervals must be positive and finite."));
+        "Scan timer intervals must be positive and supported."));
     return;
   }
   // Validate the program before any motor or laser requests are emitted.
   for (const auto& instruction : job.instructions) {
-    if (const auto* move = std::get_if<algo::MoveRelative>(&instruction)) {
-      if (!std::isfinite(move->dx * job.pixel_size_mm) ||
-          !std::isfinite(move->dy * job.pixel_size_mm)) {
+    if (const auto* move = std::get_if<algo::MoveAbsolute>(&instruction)) {
+      if (!std::isfinite(move->x_mm) || !std::isfinite(move->y_mm)) {
         emit Finished(errors::Error::InvalidArgument(
             "Scan move exceeds the supported distance."));
         return;
@@ -68,10 +66,20 @@ void ScanWorker::Start(ScanJob job) {
   pause_laser_off_ = false;
   final_result_.reset();
   PublishProgress();
-  ExecuteNextInstruction();
+  capturing_origin_ = true;
+  pending_x_ = NextRequestId();
+  pending_y_ = NextRequestId();
+  operation_timer_->start(static_cast<int>(job_.operation_timeout.count()));
+  emit PositionRequested(Axis::kX, *pending_x_);
+  emit PositionRequested(Axis::kY, *pending_y_);
 }
 
 RequestId ScanWorker::NextRequestId() { return next_request_id_++; }
+void ScanWorker::OnPositionCaptured(Axis axis, RequestId id, double position_mm) {
+  if (!capturing_origin_ || progress_.phase != ScanPhase::kRunning) return;
+  if (axis == Axis::kX && pending_x_ == id) origin_x_mm_ = position_mm;
+  if (axis == Axis::kY && pending_y_ == id) origin_y_mm_ = position_mm;
+}
 void ScanWorker::PublishProgress() {
   const bool active = progress_.phase == ScanPhase::kRunning ||
                       progress_.phase == ScanPhase::kPausing;
@@ -118,19 +126,21 @@ void ScanWorker::ExecuteNextInstruction() {
     return;
   }
   const auto& instruction = job_.instructions[progress_.completed_instructions];
-  if (const auto* move = std::get_if<algo::MoveRelative>(&instruction)) {
-    // Allocate both IDs before emitting; diagonal moves wait for both axes.
-    if (move->dx != 0) pending_x_ = NextRequestId();
-    if (move->dy != 0) pending_y_ = NextRequestId();
-    if (!pending_x_ && !pending_y_) {
-      CompleteInstruction();
+  if (const auto* move = std::get_if<algo::MoveAbsolute>(&instruction)) {
+    const double x = origin_x_mm_ + move->x_mm;
+    const double y = origin_y_mm_ + move->y_mm;
+    if (!std::isfinite(x) || !std::isfinite(y)) {
+      BeginCleanup(errors::Error::InvalidArgument("Scan target is not finite."));
       return;
     }
+    // Allocate both IDs before emitting; diagonal moves wait for both axes.
+    pending_x_ = NextRequestId();
+    pending_y_ = NextRequestId();
     operation_timer_->start(static_cast<int>(job_.motion_timeout.count()));
     if (pending_x_)
-      emit MoveRequested(Axis::kX, *pending_x_, move->dx * job_.pixel_size_mm);
+      emit MoveRequested(Axis::kX, *pending_x_, x);
     if (pending_y_)
-      emit MoveRequested(Axis::kY, *pending_y_, move->dy * job_.pixel_size_mm);
+      emit MoveRequested(Axis::kY, *pending_y_, y);
     return;
   }
   switch (std::get<algo::Action>(instruction)) {
@@ -216,7 +226,11 @@ void ScanWorker::CheckPendingRequests() {
   if (pending_x_ || pending_y_ || pending_laser_) return;
   if (progress_.phase == ScanPhase::kStopping)
     FinishCleanup();
-  else
+  else if (capturing_origin_) {
+    capturing_origin_ = false;
+    operation_timer_->stop();
+    ExecuteNextInstruction();
+  } else
     CompleteInstruction();
 }
 
@@ -250,6 +264,7 @@ void ScanWorker::Resume() {
 }
 
 void ScanWorker::BeginCleanup(errors::Error result) {
+  capturing_origin_ = false;
   EnsureTimers();
   operation_timer_->stop();
   exposure_timer_->stop();

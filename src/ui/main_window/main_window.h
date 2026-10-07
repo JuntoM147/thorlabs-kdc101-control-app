@@ -7,6 +7,7 @@
 #include <array>
 #include <functional>
 #include <map>
+#include <cmath>
 
 #include "ui_types.h"
 #include "workers/worker_manager/worker_manager.h"
@@ -28,9 +29,14 @@ class MainWindow : public QMainWindow {
     return scan_configuration_.pixel_size_mm * 1000.0;
   }
   bool CanStartScan() const;
+  QSizeF ScanSizeMillimetres() const {
+    return {scan_image_size_.width() * scan_configuration_.pixel_size_mm,
+            scan_image_size_.height() * scan_configuration_.pixel_size_mm};
+  }
   bool CanPreviewScan() const {
     return CanSetStartPixel() && has_pattern_ && start_pixel_set_ &&
-           direction_set_;
+           direction_set_ && std::isfinite(scan_configuration_.pixel_size_mm) &&
+           scan_configuration_.pixel_size_mm > 0;
   }
   algo::Program PreviewInstructions() const;
   bool CanResetScan() const;

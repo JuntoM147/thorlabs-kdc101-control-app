@@ -52,8 +52,8 @@ void ScanPreview::ShowThrough(std::size_t instruction_count) {
   const auto count = std::min(instruction_count, program_.size());
   while (instruction_ < count) {
     const auto& instruction = program_[instruction_++];
-    if (const auto* move = std::get_if<algo::MoveRelative>(&instruction)) {
-      cursor_ += QPointF(move->dx, move->dy);
+    if (const auto* move = std::get_if<algo::MoveAbsolute>(&instruction)) {
+      cursor_ = QPointF(move->x, move->y);
       if (laser_on_) drawing_.lineTo(cursor_);
     } else {
       ApplyAction(std::get<algo::Action>(instruction));
@@ -84,8 +84,8 @@ void ScanPreview::Advance() {
     return;
   }
   const auto& instruction = program_[instruction_];
-  if (const auto* move = std::get_if<algo::MoveRelative>(&instruction)) {
-    if (!target_) target_ = cursor_ + QPointF(move->dx, move->dy);
+  if (const auto* move = std::get_if<algo::MoveAbsolute>(&instruction)) {
+    if (!target_) target_ = QPointF(move->x, move->y);
     const QPointF delta = *target_ - cursor_;
     const double distance = std::hypot(delta.x(), delta.y());
     // Cross the longest image dimension in roughly two and a half seconds.
