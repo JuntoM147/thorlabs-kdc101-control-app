@@ -4,7 +4,7 @@
   "configurePresets": [
     {
       "name": "app",
-      "displayName": "Qt app",
+      "displayName": "Confo Quanta",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build-app"
