@@ -16,12 +16,12 @@ class MotorWorker final : public QObject {
   Q_OBJECT
 
  public:
-  explicit MotorWorker(QObject* parent = nullptr);
+  explicit MotorWorker(Axis axis = Axis::kX, QObject* parent = nullptr);
   ~MotorWorker() override;
 
  public slots:
   void ConnectDevice(workers::RequestId id, QString serial_number,
-                     bool simulation = false);
+                     bool simulation = false, short channel = 0);
   void DisconnectDevice(workers::RequestId id);
   void Configure(workers::RequestId id, workers::MotorSettings settings);
   void Home(workers::RequestId id);
@@ -59,7 +59,8 @@ class MotorWorker final : public QObject {
                    bool continuous = false);
   void OnTimeout();
 
-  std::unique_ptr<thorlabs::KDC101> motor_;
+  const Axis axis_;
+  std::unique_ptr<thorlabs::NRT100> motor_;
   std::shared_ptr<const thorlabs::KinesisSimulation> simulation_;
   QTimer* poll_timer_ =
       nullptr;  // QObject child, created in the worker thread.

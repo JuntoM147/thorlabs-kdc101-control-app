@@ -19,7 +19,8 @@ namespace ui {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle(tr("Confo Quanta"));
-  setFixedSize(680, 780);
+  setMinimumSize(680, 880);
+  resize(680, 880);
   // Initial values, with pixel size editable in the Laser tab.
   scan_configuration_.pixel_size_mm = 0.00025;  // 0.25 micrometres per pixel.
   scan_configuration_.exposure_time = std::chrono::milliseconds(10);
@@ -295,10 +296,9 @@ QStringList MainWindow::ScanStartBlockers() const {
 
 algo::Program MainWindow::PreviewInstructions() const {
   if (!CanPreviewScan()) return {};
-  return algo::GenerateInstructions(scan_configuration_.start_pixel,
-                                    scan_configuration_.pattern,
-                                    scan_configuration_.pixel_size_mm,
-                                    scan_configuration_.direction);
+  return algo::GenerateInstructions(
+      scan_configuration_.start_pixel, scan_configuration_.pattern,
+      scan_configuration_.pixel_size_mm, scan_configuration_.direction);
 }
 
 bool MainWindow::CanStartScan() const { return ScanStartBlockers().isEmpty(); }

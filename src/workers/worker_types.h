@@ -8,7 +8,7 @@
 #include <optional>
 
 #include "algo/instructions/instructions.h"
-#include "devices/kdc101/kdc101.h"
+#include "devices/nrt100/nrt100.h"
 #include "error/error.h"
 
 namespace workers {

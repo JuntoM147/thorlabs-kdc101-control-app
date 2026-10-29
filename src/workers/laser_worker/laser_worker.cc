@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include "devices/ni_daq_laser/ni_daq_laser.h"
+#include "devices/pcie6323_laser/pcie6323_laser.h"
 
 namespace workers {
 
@@ -38,7 +38,8 @@ void LaserWorker::ConnectDevice(RequestId id, QString output_channel) {
     return;
   }
 
-  auto result = NI_DAQ::Laser::CreateLaser(output_channel.toStdString());
+  auto result =
+      NI_DAQ::Pcie6323Laser::CreateLaser(output_channel.toStdString());
   if (!result) {
     FinishRequest(id, result.error().WithContext("Connect laser"));
     return;

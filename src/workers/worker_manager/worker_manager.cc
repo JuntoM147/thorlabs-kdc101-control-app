@@ -1,12 +1,13 @@
 #include "worker_manager.h"
 
 #include <QEventLoop>
+#include <utility>
 
 namespace workers {
 namespace {
-template <typename Worker>
-Worker* StartWorker(QThread& thread, const QString& name) {
-  auto* worker = new Worker;
+template <typename Worker, typename... Args>
+Worker* StartWorker(QThread& thread, const QString& name, Args&&... args) {
+  auto* worker = new Worker(std::forward<Args>(args)...);
   thread.setObjectName(name);
   worker->moveToThread(&thread);
   QObject::connect(worker, &Worker::ShutdownFinished, &thread, &QThread::quit,
@@ -41,9 +42,9 @@ void RegisterWorkerMetaTypes() {
 
 WorkerManager::WorkerManager() {
   RegisterWorkerMetaTypes();
-  motors[0] = StartWorker<MotorWorker>(motor_threads_[0], "X motor");
-  motors[1] = StartWorker<MotorWorker>(motor_threads_[1], "Y motor");
-  motors[2] = StartWorker<MotorWorker>(motor_threads_[2], "Z motor");
+  motors[0] = StartWorker<MotorWorker>(motor_threads_[0], "X motor", Axis::kX);
+  motors[1] = StartWorker<MotorWorker>(motor_threads_[1], "Y motor", Axis::kY);
+  motors[2] = StartWorker<MotorWorker>(motor_threads_[2], "Z motor", Axis::kZ);
   laser = StartWorker<LaserWorker>(laser_thread_, "Laser");
   scan = StartWorker<ScanWorker>(scan_thread_, "Scan");
 }

@@ -121,7 +121,7 @@ void MainWindow::ConnectMotorWorker(Axis axis, workers::MotorWorker* motor) {
                 [connection](auto* motor, auto id) {
                   motor->ConnectDevice(
                       id, QString::fromStdString(connection.serial_number),
-                      connection.simulation);
+                      connection.simulation, connection.channel);
                 },
                 std::nullopt, false, true);
           });
@@ -203,14 +203,18 @@ void MainWindow::ConnectMotorWorker(Axis axis, workers::MotorWorker* motor) {
 
 void MainWindow::ConnectScanAxis(workers::ScanWorker* scan, Axis axis,
                                  workers::MotorWorker* motor) {
-  connect(scan, &workers::ScanWorker::PositionRequested, motor,
-          [motor, axis](Axis requested, auto id) {
-            if (requested == axis) motor->CapturePosition(id);
-          }, Qt::QueuedConnection);
-  connect(motor, &workers::MotorWorker::PositionCaptured, scan,
-          [scan, axis](auto id, double position) {
-            scan->OnPositionCaptured(axis, id, position);
-          }, Qt::QueuedConnection);
+  connect(
+      scan, &workers::ScanWorker::PositionRequested, motor,
+      [motor, axis](Axis requested, auto id) {
+        if (requested == axis) motor->CapturePosition(id);
+      },
+      Qt::QueuedConnection);
+  connect(
+      motor, &workers::MotorWorker::PositionCaptured, scan,
+      [scan, axis](auto id, double position) {
+        scan->OnPositionCaptured(axis, id, position);
+      },
+      Qt::QueuedConnection);
   connect(
       scan, &workers::ScanWorker::MoveRequested, motor,
       [motor, axis](Axis requested, auto id, double position) {
@@ -284,8 +288,7 @@ void MainWindow::ConnectScanWorker(workers::ScanWorker* scan) {
             workers::ScanJob job;
             job.instructions = algo::GenerateInstructions(
                 configuration.start_pixel, configuration.pattern,
-                configuration.pixel_size_mm,
-                configuration.direction);
+                configuration.pixel_size_mm, configuration.direction);
             job.pixel_exposure = configuration.exposure_time;
             emit ScanPreviewStarted(job.instructions);
             SetControlsLocked(

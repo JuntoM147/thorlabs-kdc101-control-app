@@ -40,6 +40,7 @@ struct MotorConnection {
   Axis axis;
   std::string serial_number;
   bool simulation = false;
+  short channel = 0;  // NRT controller channel.
 };
 struct LaserConnection {
   std::string digital_output_channel;

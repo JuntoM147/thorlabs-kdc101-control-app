@@ -106,7 +106,9 @@ QWidget* CreateLaserControlSection(MainWindow& view, QWidget* parent) {
   output_row->addWidget(status);
   layout->addLayout(output_row);
 
-  auto* channel = new QLineEdit(QStringLiteral("Dev1/port0/line0"), section);
+  auto* channel = new QLineEdit(QString{}, section);
+  channel->setPlaceholderText(
+      QObject::tr("Physical digital line from your wiring"));
   channel->setAccessibleName(QObject::tr("Laser digital output channel"));
   layout->insertWidget(1, channel);
   QObject::connect(

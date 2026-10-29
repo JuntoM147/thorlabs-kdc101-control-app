@@ -1,19 +1,12 @@
 #ifndef KINESIS_SIMULATION_H_
 #define KINESIS_SIMULATION_H_
 
-#include "Thorlabs.MotionControl.KCube.DCServo.h"
-
 namespace thorlabs {
 
 class KinesisSimulation {
  public:
-  explicit KinesisSimulation(bool simulation = true) : simulation_(simulation) {
-    if (simulation_) TLI_InitializeSimulations();
-  }
-
-  ~KinesisSimulation() {
-    if (simulation_) TLI_UninitializeSimulations();
-  }
+  explicit KinesisSimulation(bool simulation = true);
+  ~KinesisSimulation();
 
   KinesisSimulation(const KinesisSimulation&) = delete;
   KinesisSimulation& operator=(const KinesisSimulation&) = delete;

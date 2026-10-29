@@ -8,7 +8,7 @@
 #include "workers/worker_types.h"
 
 namespace NI_DAQ {
-class Laser;
+class Pcie6323Laser;
 }
 
 namespace workers {
@@ -38,7 +38,7 @@ class LaserWorker final : public QObject {
  private:
   void FinishRequest(RequestId id, errors::Error result);
   bool RejectDuringShutdown(RequestId id);
-  std::unique_ptr<NI_DAQ::Laser> laser_;
+  std::unique_ptr<NI_DAQ::Pcie6323Laser> laser_;
   LaserState state_;
   bool shutting_down_ = false;
 };

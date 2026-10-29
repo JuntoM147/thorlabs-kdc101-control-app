@@ -1,12 +1,17 @@
 #include "motor_worker.h"
 
+#include <array>
 #include <cmath>
 #include <utility>
 
+#include "devices/kinesis_simulation/kinesis_simulation.h"
+
 namespace workers {
 namespace {
+constexpr std::array<int, 3> kStageTravelMm{NRT_X_TRAVEL_MM, NRT_Y_TRAVEL_MM,
+                                            NRT_Z_TRAVEL_MM};
 constexpr int kPollIntervalMs = thorlabs::kDefaultPollingIntervalMs;
-// Allow long moves at speeds below the default 0.1 mm/s.
+// Allow long moves at low configured speeds.
 constexpr int kMotionTimeoutMs = 60 * 60 * 1000;
 constexpr int kStopTimeoutMs = 5000;
 
@@ -25,7 +30,8 @@ std::shared_ptr<const thorlabs::KinesisSimulation> SimulationSession(
 }
 }  // namespace
 
-MotorWorker::MotorWorker(QObject* parent) : QObject(parent) {}
+MotorWorker::MotorWorker(Axis axis, QObject* parent)
+    : QObject(parent), axis_(axis) {}
 MotorWorker::~MotorWorker() = default;
 
 bool MotorWorker::CheckReady(RequestId id) {
@@ -44,7 +50,7 @@ bool MotorWorker::CheckReady(RequestId id) {
 }
 
 void MotorWorker::ConnectDevice(RequestId id, QString serial_number,
-                                bool simulation) {
+                                bool simulation, short channel) {
   if (motor_ || shutting_down_) {
     emit RequestFinished(id, errors::Error::Failure(
                                  errors::ErrorCode::kBusy,
@@ -57,9 +63,19 @@ void MotorWorker::ConnectDevice(RequestId id, QString serial_number,
         id, errors::Error::InvalidArgument("Enter a motor serial number."));
     return;
   }
+  const std::size_t axis_index = static_cast<std::size_t>(axis_);
+  if (axis_index >= kStageTravelMm.size()) {
+    emit RequestFinished(id,
+                         errors::Error::InvalidArgument("Unknown motor axis."));
+    return;
+  }
   auto simulation_session = SimulationSession(simulation);
-  auto result = thorlabs::KDC101::CreateMotor(
-      serial_number.toStdString(), kPollIntervalMs, simulation_session);
+  const auto stage = kStageTravelMm[axis_index] == 150
+                         ? thorlabs::NRT100::StageModel::kNrt150M
+                         : thorlabs::NRT100::StageModel::kNrt100M;
+  auto result =
+      thorlabs::NRT100::CreateMotor(serial_number.toStdString(), channel,
+                                    kPollIntervalMs, simulation_session, stage);
   if (!result) {
     emit RequestFinished(id, result.error());
     return;
@@ -153,8 +169,9 @@ void MotorWorker::CapturePosition(RequestId id) {
     return;
   }
   if (IsMoving(*status) || !std::isfinite(*position)) {
-    emit RequestFinished(id, errors::Error::Failure(
-        errors::ErrorCode::kBusy, "Scan origin requires a stopped motor."));
+    emit RequestFinished(
+        id, errors::Error::Failure(errors::ErrorCode::kBusy,
+                                   "Scan origin requires a stopped motor."));
     return;
   }
   emit PositionCaptured(id, *position);
