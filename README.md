@@ -1,30 +1,48 @@
 # About
-TODO
 
-# Dependencies
+This project is a **Windows** desktop application for **Confo Quanta's laser writing product**. 
+Operators can control the position of a stage by controlling the motors through the GUI and load an image for the device to draw. 
 
-The dependencies to compile and run this application are listed in the table below:
+The application is written in **C++** with a user interface made using the **Qt** library. 
 
-| Dependency | Purpose | Download |
-| --- | --- | --- |
-| Qt 6.5+ (Core and Widgets, MSVC kit) | UI | [Qt](https://www.qt.io) |
-| CMake 3.21+ | Build configuration and presets | [CMake](https://cmake.org/download/) |
-| MSVC with C++23 | Compiler | [Visual Studio / Build Tools](https://visualstudio.microsoft.com/downloads/) |
-| Thorlabs Kinesis SDK | KDC101 motor control | [Kinesis](https://www.thorlabs.com/software-pages/motion_control/) |
-| NI-DAQmx library | Laser control | [NI-DAQmx](https://www.ni.com/en/support/downloads/drivers/download.ni-daq-mx.html) |
+# Getting started
 
+Install [Git for Windows](https://gitforwindows.org/) if needed. 
 
-# Build and run
+Open **Command Prompt** in the folder where you want to keep the project and run:
 
-From the repository root, run these commands in PowerShell:
-
-```powershell
-cmake -S . -B build-app-vs2026 -G "Visual Studio 18 2026" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.11.2/msvc2022_64" -DBUILD_TESTING=OFF -DAPPLICATION_USE_KINESIS_SIMULATION=OFF -DDEVICES_USE_FAKE_KINESIS=OFF -DDEVICES_USE_FAKE_NI_DAQ=OFF -DCMAKE_RUNTIME_OUTPUT_DIRECTORY="$PWD/build-app-vs2026"
-
-cmake --build build-app-vs2026 --config Release --target frontend
-
-.\build-app-vs2026\Release\frontend.exe
+```bat
+git clone https://github.com/JuntoM147/thorlabs-kdc101-control-app.git
+cd thorlabs-kdc101-control-app
 ```
+
+On 64-bit Windows, you will need:
+
+- [Visual Studio 2022 or Build Tools 2022](https://visualstudio.microsoft.com/vs/older-downloads/) with **Desktop development with C++** (MSVC v143 and Windows SDK).
+- [CMake 3.21 or newer](https://cmake.org/download/) on your PATH.
+- [Qt 6.5 or newer](https://www.qt.io/download-qt-installer-oss) with the MSVC 64-bit desktop kit (Core, Gui, and Widgets).
+- [Thorlabs Kinesis](https://www.thorlabs.com/software-pages/motion_control/) with the 64-bit benchtop stepper SDK and runtime.
+- [NI-DAQmx](https://www.ni.com/en/support/downloads/drivers/download.ni-daq-mx.html) with the driver and C development support.
+
+In File Explorer, open your Qt installation folder, then your Qt version, and copy the full path of the 64-bit MSVC kit folder containing `bin`, `include`, and `lib` (for example, `C:\Qt\6.11.2\msvc2022_64`) for both commands below.
+
+To check you have installed all the dependencies, run this from the repository root in **Command Prompt**, using your Qt kit path:
+
+```bat
+powershell -NoProfile -ExecutionPolicy RemoteSigned -File tools\check_dependencies.ps1 -QtDir "C:/Qt/6.11.2/msvc2022_64"
+```
+
+To build, run this line in **Command Prompt** from the repository root with the same Qt kit path. CMake checks the compiler and development libraries before building the Release application.
+
+```bat
+cmake --preset app -DCMAKE_PREFIX_PATH="C:/Qt/6.11.2/msvc2022_64" && cmake --build --preset app
+```
+
+Launch `build-app\Release\frontend.exe` to check that the runtime libraries load.
+
+# Documentation
+
+For architecture and design justifications please refer to the [documentation here](docs/README.md)
 
 # Coding Style
 

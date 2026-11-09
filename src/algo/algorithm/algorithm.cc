@@ -12,6 +12,8 @@ struct Stroke {
   PixelPosition end;
 };
 
+
+// TODO: This is horrible code duplication, needs refactoring 
 void RowMajorOrder(const BinaryMatrix& matrix,
                    int row,
                    std::vector<Stroke>& strokes) {
