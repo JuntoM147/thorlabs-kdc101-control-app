@@ -1,3 +1,5 @@
+option(KINESIS_SIMULATION "Connect motors through Kinesis Simulator" OFF)
+
 add_library(worker_interfaces STATIC worker_manager/worker_manager.cc worker_manager/worker_manager.h
     worker_types.h motor_worker/motor_worker.cc motor_worker/motor_worker.h
     laser_worker/laser_worker.cc laser_worker/laser_worker.h
@@ -5,3 +7,5 @@ add_library(worker_interfaces STATIC worker_manager/worker_manager.cc worker_man
 target_include_directories(worker_interfaces PUBLIC "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(worker_interfaces PUBLIC
     Qt6::Core kinesis_devices pcie6323_laser algo_algorithm)
+target_compile_definitions(worker_interfaces PUBLIC
+    KINESIS_SIMULATION=$<BOOL:${KINESIS_SIMULATION}>)

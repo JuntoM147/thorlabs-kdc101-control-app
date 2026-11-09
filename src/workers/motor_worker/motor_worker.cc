@@ -69,7 +69,7 @@ void MotorWorker::ConnectDevice(RequestId id, QString serial_number,
                          errors::Error::InvalidArgument("Unknown motor axis."));
     return;
   }
-  auto simulation_session = SimulationSession(simulation);
+  auto simulation_session = SimulationSession(KINESIS_SIMULATION || simulation);
   const auto stage = kStageTravelMm[axis_index] == 150
                          ? thorlabs::NRT100::StageModel::kNrt150M
                          : thorlabs::NRT100::StageModel::kNrt100M;

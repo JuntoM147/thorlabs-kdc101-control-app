@@ -1,13 +1,30 @@
 {
   "version": 2,
-  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "app",
       "displayName": "Confo Quanta",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
-      "binaryDir": "${sourceDir}/build-app"
+      "binaryDir": "${sourceDir}/build-app",
+      "cacheVariables": {
+        "KINESIS_SIMULATION": "OFF"
+      }
+    },
+    {
+      "name": "simulation",
+      "inherits": "app",
+      "displayName": "Confo Quanta (Kinesis Simulator)",
+      "binaryDir": "${sourceDir}/build-simulation",
+      "cacheVariables": {
+        "PCIE6323_LASER_MODE": "unconfigured",
+        "KINESIS_SIMULATION": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -15,7 +32,17 @@
       "name": "app",
       "configurePreset": "app",
       "configuration": "Release",
-      "targets": ["frontend"]
+      "targets": [
+        "frontend"
+      ]
+    },
+    {
+      "name": "simulation",
+      "configurePreset": "simulation",
+      "configuration": "Release",
+      "targets": [
+        "frontend"
+      ]
     }
   ]
 }

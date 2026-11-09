@@ -30,8 +30,14 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
   auto channels = std::make_shared<std::array<QComboBox*, 3>>();
   layout->addWidget(new QLabel(QObject::tr("Controller serial"), section), 0, 0,
                     1, 2);
-  auto* controller_serial = new QLineEdit(QStringLiteral("70871422"), section);
+  auto* controller_serial = new QLineEdit(
+      KINESIS_SIMULATION ? QString{} : QStringLiteral("70871422"), section);
   controller_serial->setObjectName("controllerSerial");
+  if (KINESIS_SIMULATION) {
+    controller_serial->setPlaceholderText(QObject::tr("Simulator serial"));
+    controller_serial->setToolTip(QObject::tr(
+        "Start Kinesis Simulator and enter its controller serial."));
+  }
   controller_serial->setAccessibleName(
       QObject::tr("Shared controller serial number"));
   controller_serial->setValidator(new QRegularExpressionValidator(
@@ -143,8 +149,9 @@ QWidget* CreateMotorInformationSection(MainWindow& view, QWidget* parent) {
             const short selected_channel = static_cast<short>(
                 (*channels)[static_cast<int>(axis_id)]->currentData().toInt());
 
-            emit view.ConnectMotorRequested(
-                {axis_id, serial.toStdString(), false, selected_channel});
+            emit view.ConnectMotorRequested({axis_id, serial.toStdString(),
+                                             KINESIS_SIMULATION != 0,
+                                             selected_channel});
           }
         });
     struct Availability {
